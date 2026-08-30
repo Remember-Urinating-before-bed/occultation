@@ -1,0 +1,10 @@
+# Source:
+# https://www.hko.gov.hk/en/gts/astronomy/astro_portal.html
+# Data of retrival
+# 30 Aug
+name = "Hong Kong"
+latitude_deg = 22.3020
+logitude_deg = 114.1743
+elevation_m = 0.0
+timezone = "Asia/Hong_Kong"
+dataum = "WGS84"

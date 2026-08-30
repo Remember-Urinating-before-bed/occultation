@@ -1,0 +1,8 @@
+flowchart TD
+    A["Calculation inputs"] --> B["Python calculation"]
+    B --> C["Validation test"]
+    C --> D["Parquet results"]
+    D --> E["Clickhouse"]
+    E --> F["API or CLI"]
+    B --> G["Prometheus metrics"]
+    G --> H["Grafana dashboard"]
