@@ -1,7 +1,7 @@
 [project]
 name = "occultation"
 version = "0.1.0"
-description = "A playground astronomical occulation program for HK"
+description = "A playground astronomical occultation program for HK"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
-occultation = "occultation:main"
+occultation = "occultation.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]

@@ -1,0 +1,52 @@
+# Regression fixture for Meeus Example 5 (Regulus, 1999 March 1, Palomar).
+#
+# Provenance: Jean Meeus, *Astronomical Tables*, Occultations chapter,
+# printed pp. 228-229 (PDF pp. 10-11). Elements come from Table II and are
+# restated in the worked example. Meeus prints the longitude west-positive
+# (+116.8640); the project convention is east-positive, hence the sign flip.
+# Expected values are the printed results, so the paired test tolerances
+# match the number of digits the book shows.
+
+[metadata]
+source = "Jean Meeus, Astronomical Tables, Occultations"
+example = "Example 5 - Occultation of Regulus, 1999 March 1"
+printed_pages = "228-229"
+
+[observer]
+# Project convention: east positive. Meeus prints 116.8640 degrees west.
+longitude_deg_east = -116.8640
+latitude_deg = 33.3562
+elevation_m = 1706.0
+
+[event]
+reference_hour_td = 10.0
+delta_t_seconds = 65.0
+
+[elements]
+star_declination_deg = 11.9694
+greenwich_hour_angle_at_reference_deg = 156.6836
+greenwich_hour_angle_rate_deg_per_hour = 15.04107
+moon_shadow_radius_earth_radii = 0.272495
+
+[elements.moon_shadow_x]
+at_reference = 0.22151
+linear_rate_per_hour = 0.55549
+quadratic_term_per_hour_squared = 0.0
+
+[elements.moon_shadow_y]
+at_reference = 0.19947
+linear_rate_per_hour = -0.15258
+quadratic_term_per_hour_squared = -0.00001
+
+[expected]
+rho_sin_geocentric_latitude = 0.546862
+rho_cos_geocentric_latitude = 0.836338
+hours_after_reference = 0.455608
+dynamical_time_hour = 10.455608
+# The book prints 10h 26m 15s UT, i.e. 10.4375 h.
+universal_time_hour = 10.4375
+separation_in_moon_radii = 1.1526
+limb_clearance_in_moon_radii = 0.1526
+position_angle_deg = 24.67
+altitude_deg = 43.0
+is_occultation = false
