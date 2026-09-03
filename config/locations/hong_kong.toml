@@ -1,10 +1,14 @@
 # Source:
 # https://www.hko.gov.hk/en/gts/astronomy/astro_portal.html
-# Data of retrival
-# 30 Aug
+# Retrieved: 2025-08-30
+#
+# Keys mirror the domain model in occultation.domain.observer, so longitude
+# is east-positive and explicit about it. HKO calculates its astronomical
+# information for mean sea level at the Observatory site: 22d18'07.3" N,
+# 114d10'27.6" E = 22.30203 N, 114.17433 E.
 name = "Hong Kong"
 latitude_deg = 22.3020
-logitude_deg = 114.1743
+longitude_deg_east = 114.1743
 elevation_m = 0.0
 timezone = "Asia/Hong_Kong"
-dataum = "WGS84"
+datum = "WGS84"
