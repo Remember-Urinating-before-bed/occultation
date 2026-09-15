@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How this repo is built — Python, tools, and the conveyor belt</title>
+<style>
+  :root {
+    --ink: #101418; --ink-soft: #4b5563; --paper: #f4f6f8; --card: #ffffff;
+    --line: #d7dde3; --slate: #0f172a; --accent: #2563eb; --accent-soft: #e6efff;
+    --warn: #c2410c; --warn-soft: #fdece4; --ok: #15803d; --ok-soft: #e7f6ec;
+    --violet: #6d28d9; --violet-soft: #f1eaff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 0 22px 90px; }
+  header.hero {
+    background: linear-gradient(160deg, #0f172a 0%, #16233f 60%, #0b1120 100%);
+    color: #fff; padding: 70px 22px 60px; position: relative; overflow: hidden;
+  }
+  header.hero .inner { max-width: 1020px; margin: 0 auto; position: relative; z-index: 2; }
+  header.hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); margin: 0 0 12px; line-height: 1.06; letter-spacing: -0.02em; }
+  header.hero p { font-size: clamp(1rem, 2.2vw, 1.25rem); color: #c6d2e8; margin: 0; max-width: 680px; }
+  header.hero .kicker {
+    display: inline-block; font-size: .78rem; letter-spacing: .16em; text-transform: uppercase;
+    color: #93a7cc; border: 1px solid #2b3a57; border-radius: 999px; padding: 6px 14px; margin-bottom: 20px;
+  }
+  header.hero svg { position: absolute; right: -40px; top: -30px; width: 520px; opacity: .5; z-index: 1; }
+  section { padding: 60px 0 8px; border-top: 1px solid var(--line); margin-top: 52px; }
+  section:first-of-type { border-top: 0; }
+  .num {
+    display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+    border-radius: 50%; background: var(--slate); color: #fff; font-size: .95rem; font-weight: 700;
+    margin-right: 12px; flex: none;
+  }
+  h2 { display: flex; align-items: center; font-size: clamp(1.35rem, 3vw, 1.9rem); margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 + .lede { color: var(--ink-soft); font-size: 1.05rem; margin: 0 0 28px 46px; }
+  h3 { font-size: 1.04rem; margin: 0 0 6px; }
+  p { margin: 0 0 14px; }
+  .big { font-size: clamp(1.1rem, 2.4vw, 1.4rem); font-weight: 600; line-height: 1.35; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+  .grid { display: grid; gap: 18px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 800px) { .g2, .g3 { grid-template-columns: 1fr; } }
+  figure { margin: 0 0 10px; }
+  figure svg { width: 100%; height: auto; display: block; border-radius: 14px; }
+  figcaption { color: var(--ink-soft); font-size: .92rem; margin-top: 10px; }
+  .chip { display: inline-block; font-size: .78rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: #1d4ed8; margin-bottom: 10px; }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); }
+  .chip.violet { background: var(--violet-soft); color: var(--violet); }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: .89em; }
+  code { background: #e9edf1; padding: 2px 6px; border-radius: 5px; }
+  pre { background: var(--slate); color: #dbe6ff; padding: 18px 20px; border-radius: 14px; overflow-x: auto; font-size: .87rem; line-height: 1.6; margin: 0 0 14px; }
+  pre code { background: none; padding: 0; color: inherit; }
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; margin: 0 0 10px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .76rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+  tr:last-child td { border-bottom: 0; }
+  .note { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 14px 18px; border-radius: 0 12px 12px 0; margin: 0 0 14px; }
+  .note.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .note.ok { border-color: var(--ok); background: var(--ok-soft); }
+  .note p:last-child { margin-bottom: 0; }
+  ul.tight { margin: 0 0 14px; padding-left: 22px; }
+  ul.tight li { margin-bottom: 6px; }
+  .flow { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+  .flow .step { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; text-align: center; }
+  .flow .step .icon { font-size: 1.7rem; display: block; margin-bottom: 6px; }
+  .flow .step h3 { font-size: .95rem; margin-bottom: 4px; }
+  .flow .step p { font-size: .84rem; color: var(--ink-soft); margin: 0; }
+  .flow .arrow { align-self: center; color: var(--ink-soft); font-size: 1.4rem; }
+  footer { text-align: center; color: var(--ink-soft); font-size: .9rem; padding: 50px 0 0; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+
+<header class="hero">
+  <svg viewBox="0 0 520 420" aria-hidden="true">
+    <g stroke="#3b82f6" stroke-width="2" fill="none" opacity=".55">
+      <rect x="180" y="60" width="180" height="120" rx="14"/>
+      <rect x="120" y="220" width="180" height="120" rx="14"/>
+      <rect x="280" y="240" width="150" height="90" rx="14"/>
+    </g>
+    <g fill="#93c5fd" opacity=".7" font-family="ui-monospace, Menlo, monospace" font-size="15">
+      <text x="200" y="128">code</text>
+      <text x="140" y="288">tools</text>
+      <text x="300" y="296">data</text>
+    </g>
+  </svg>
+  <div class="inner">
+    <span class="kicker">Part 3 · the machinery</span>
+    <h1>How this repo<br>is built</h1>
+    <p>No Python, systems, or tooling background assumed. Ten ideas, each with a picture — plus the answers to the seven questions this repo raised.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section id="shape">
+    <h2><span class="num">1</span>The shape of a Python project</h2>
+    <p class="lede">A <strong>package</strong> is a folder of Python files. A <strong>module</strong> is one file. That is the whole hierarchy.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 330" role="img" aria-label="A folder called src contains a folder called occultation, which contains Python files and two subfolders.">
+        <rect width="940" height="330" fill="#0f172a" rx="14"/>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="15" fill="#dbe6ff">
+          <text x="40" y="56">📁 src/</text>
+          <text x="90" y="96">📁 occultation/</text>
+          <text x="140" y="136">📄 __init__.py</text>
+          <text x="140" y="176">📄 cli.py</text>
+          <text x="140" y="216">📁 core/</text>
+          <text x="190" y="256">📄 local_circumstances.py</text>
+          <text x="140" y="296">📁 domain/</text>
+        </g>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#7f9bd1">
+          <text x="560" y="96">the package — this is what you install</text>
+          <text x="560" y="176">one module = one file</text>
+          <text x="560" y="216">the maths</text>
+          <text x="560" y="296">the data shapes</text>
+        </g>
+        <g stroke="#2b3a57" stroke-width="1">
+          <path d="M540 90 H900"/><path d="M540 170 H900"/><path d="M540 210 H900"/><path d="M540 290 H900"/>
+        </g>
+      </svg>
+      <figcaption>Why <code>src/</code>? It keeps the importable code out of the repository root, so tests cannot accidentally import the wrong copy. It is a convention, not a requirement.</figcaption>
+    </figure>
+
+    <div class="grid g3">
+      <div class="card">
+        <span class="chip">Import</span>
+        <h3>Borrowing code</h3>
+        <p><code>from occultation.domain.observer import ObserverLocation</code> means “go into that file and bring this name here”.</p>
+      </div>
+      <div class="card">
+        <span class="chip">__init__.py</span>
+        <h3>The “this is a folder of code” marker</h3>
+        <p>A file that tells the tools a folder is a package. This repo has one in <em>every</em> package folder, nested ones included — see <a href="#q3">Q3</a>.</p>
+      </div>
+      <div class="card">
+        <span class="chip">__pycache__</span>
+        <h3>Python's leftovers</h3>
+        <p>Speed-up files Python writes by itself. Never edited, never committed — the ignore file hides them.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="venv">
+    <h2><span class="num">2</span>Where the libraries live</h2>
+    <p class="lede">Your project does not borrow from your laptop. It has its own private shelf of libraries.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 340" role="img" aria-label="The laptop's system Python is untouched; the project has its own virtual environment folder holding Python and the libraries.">
+        <rect width="940" height="340" fill="#f8fafc" rx="14" stroke="#d7dde3"/>
+        <rect x="40" y="60" width="360" height="220" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+        <text x="220" y="100" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="16" fill="#0f172a">your Mac</text>
+        <text x="220" y="140" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#64748b">system Python 3.9</text>
+        <text x="220" y="170" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#64748b">do not touch</text>
+        <text x="220" y="222" text-anchor="middle" font-size="34">🚫</text>
+        <rect x="540" y="60" width="360" height="220" rx="16" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+        <text x="720" y="100" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="16" fill="#0f172a">📁 .venv/</text>
+        <text x="720" y="140" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#64748b">Python 3.12.14</text>
+        <text x="720" y="170" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#64748b">skyfield, numpy, pytest…</text>
+        <text x="720" y="222" text-anchor="middle" font-size="34">✅</text>
+        <text x="470" y="150" text-anchor="middle" font-size="26" fill="#94a3b8">≠</text>
+        <text x="470" y="290" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#64748b">separate shelves — nothing is shared</text>
+      </svg>
+      <figcaption>This folder is called a <strong>virtual environment</strong>. It is thrown away and rebuilt at will, which is why it is never committed to Git.</figcaption>
+    </figure>
+
+    <div class="note">
+      <p><strong>Why bother?</strong> Two projects on one laptop can then want different versions of the same library without fighting. This is the single most important habit in Python, and this repo does it properly.</p>
+    </div>
+
+    <div class="note warn">
+      <p><strong>uv still makes a <code>.venv/</code> — so what changed?</strong> uv is not a replacement for the idea of a virtual environment; it is a much faster, stricter tool that <em>creates and manages</em> one. The comparison, honestly:</p>
+      <table>
+        <tr><th></th><th>venv + pip</th><th>conda</th><th>uv (this repo)</th></tr>
+        <tr><td>Makes a private shelf</td><td>yes, but you activate it by hand</td><td>yes, its own kind</td><td>yes, automatically</td></tr>
+        <tr><td>Installs Python itself</td><td>no</td><td>yes</td><td>yes (<code>uv python install</code>)</td></tr>
+        <tr><td>Locks exact versions</td><td>not by default</td><td>environment.yml is loose</td><td>yes, <code>uv.lock</code>, CI enforces it</td></tr>
+        <tr><td>Speed</td><td>slow</td><td>slow, heavy solver</td><td>seconds</td></tr>
+        <tr><td>Best at</td><td>nothing in particular</td><td>non-Python scientific binaries (GDAL, CUDA)</td><td>pure-Python projects like this one</td></tr>
+      </table>
+      <p>The honest summary: <strong>conda is not wrong, it is aimed at a different problem.</strong> This project needs one pure-Python library, so a lock file and a 2-second install beat a 500 MB solver. And the project rules forbid swapping the tool without asking first.</p>
+    </div>
+
+    <div class="note">
+      <p><strong>The five commands, spelled out</strong> (the table above, in full):</p>
+      <table>
+        <tr><th>Without uv</th><th>With uv</th></tr>
+        <tr><td class="mono">python3 -m venv .venv</td><td class="mono" rowspan="5">uv sync --locked --dev</td></tr>
+        <tr><td class="mono">source .venv/bin/activate</td></tr>
+        <tr><td class="mono">pip install -e .</td></tr>
+        <tr><td class="mono">pip install pytest-cov ruff mypy</td></tr>
+        <tr><td class="mono">pip freeze &gt; requirements.txt</td></tr>
+        <tr><td>pyenv / brew / manual download for Python 3.12</td><td class="mono">uv python install</td></tr>
+      </table>
+    </div>
+  </section>
+
+
+  <section id="uv">
+    <h2><span class="num">3</span>One tool that does the boring parts</h2>
+    <p class="lede"><strong>uv</strong> fetches Python, builds the private shelf, and installs the libraries. One command instead of five (the five are listed at the bottom of this section).</p>
+
+    <figure>
+      <svg viewBox="0 0 940 260" role="img" aria-label="uv reads the project file and the lock file, then produces the virtual environment and a runnable command.">
+        <rect width="940" height="260" fill="#f8fafc" rx="14" stroke="#d7dde3"/>
+        <rect x="40" y="70" width="200" height="110" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+        <text x="140" y="112" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#0f172a">pyproject.toml</text>
+        <text x="140" y="142" text-anchor="middle" font-size="12" fill="#64748b">what I want</text>
+        <rect x="370" y="70" width="200" height="110" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+        <text x="470" y="112" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#0f172a">uv.lock</text>
+        <text x="470" y="142" text-anchor="middle" font-size="12" fill="#64748b">the exact versions</text>
+        <rect x="700" y="70" width="200" height="110" rx="14" fill="#fff" stroke="#2563eb" stroke-width="2"/>
+        <text x="800" y="112" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#0f172a">.venv/</text>
+        <text x="800" y="142" text-anchor="middle" font-size="12" fill="#64748b">ready to run</text>
+        <g stroke="#94a3b8" stroke-width="2" fill="none">
+          <path d="M240 125 H360"/><path d="M570 125 H690"/>
+        </g>
+        <path d="M350 118 l12 7 -12 7 z" fill="#94a3b8"/>
+        <path d="M680 118 l12 7 -12 7 z" fill="#94a3b8"/>
+        <text x="300" y="112" text-anchor="middle" font-size="12" fill="#64748b">uv sync</text>
+        <text x="630" y="112" text-anchor="middle" font-size="12" fill="#64748b">exactly this</text>
+        <text x="470" y="230" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#64748b">same two files on any laptop or CI runner → same environment</text>
+      </svg>
+      <figcaption>The <strong>lock file</strong> (<code>uv.lock</code>, 603 lines) records every library and its exact version, so “works on my machine” stops being a thing.</figcaption>
+    </figure>
+
+    <div class="card">
+      <table>
+        <tr><th>Command</th><th>What it does, in words</th></tr>
+        <tr><td class="mono">uv sync --locked --dev</td><td>Build the private shelf exactly as the lock file says, including the developer tools.</td></tr>
+        <tr><td class="mono">uv run pytest</td><td>Run something <em>inside</em> that shelf, without activating anything first.</td></tr>
+        <tr><td class="mono">uv python install</td><td>Fetch the right Python (3.12) if it is missing — used by CI.</td></tr>
+        <tr><td class="mono">uv build</td><td>Package the project into a distributable file (<code>dist/*.whl</code>).</td></tr>
+      </table>
+    </div>
+
+    <div class="note">
+      <p><strong>Why not just <code>pip install</code>?</strong> Because pip installs into whatever Python it finds and does not lock versions. The project rules forbid switching away from uv without asking, precisely so every machine and CI agree.</p>
+    </div>
+  </section>
+
+
+  <section id="manifest">
+    <h2><span class="num">4</span>The project's ID card</h2>
+    <p class="lede"><code>pyproject.toml</code> is one file that answers “what is this, what does it need, what command does it provide?”</p>
+
+    <figure>
+      <svg viewBox="0 0 940 300" role="img" aria-label="The pyproject file has four labelled blocks: name and version, dependencies, console script, and build backend.">
+        <rect width="940" height="300" fill="#0f172a" rx="14"/>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="14">
+          <text x="40" y="52" fill="#7dd3fc">[project]</text>
+          <text x="60" y="80" fill="#dbe6ff">name = "occultation"</text>
+          <text x="60" y="106" fill="#dbe6ff">version = "0.1.0"</text>
+          <text x="40" y="146" fill="#7dd3fc">dependencies</text>
+          <text x="60" y="174" fill="#dbe6ff">skyfield&gt;=1.55</text>
+          <text x="40" y="214" fill="#7dd3fc">[project.scripts]</text>
+          <text x="60" y="242" fill="#dbe6ff">occultation = "occultation.cli:main"</text>
+          <text x="40" y="282" fill="#7dd3fc">[build-system]</text>
+        </g>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#7f9bd1">
+          <text x="620" y="52">who am I</text>
+          <text x="620" y="106">which version</text>
+          <text x="620" y="174">what I need at runtime</text>
+          <text x="620" y="242">the command I install</text>
+          <text x="620" y="282">how to package me</text>
+        </g>
+        <g stroke="#2b3a57" stroke-width="1">
+          <path d="M600 46 H900"/><path d="M600 100 H900"/><path d="M600 168 H900"/><path d="M600 236 H900"/><path d="M600 276 H900"/>
+        </g>
+      </svg>
+      <figcaption>Exactly one runtime library is needed: <code>skyfield</code>. The developer tools (pytest, ruff, mypy) live in a separate <code>dev</code> group so a user of the package never downloads them.</figcaption>
+    </figure>
+
+    <div class="grid g2">
+      <div class="card">
+        <span class="chip">Console script</span>
+        <h3>Typing a name instead of a path</h3>
+        <p>That one line is why <code>uv run occultation --help</code> works. It points the command at the <code>main</code> function inside <code>cli.py</code>.</p>
+      </div>
+      <div class="card">
+        <span class="chip warn">A real bug this fixed</span>
+        <h3>Pointing at the wrong place</h3>
+        <p>It used to say <code>occultation:main</code>, which found a leftover hello-world stub, so <code>--help</code> printed “Hello!”. The fix and its test are recorded in the handoff (defect D1).</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section id="three-jobs">
+    <h2><span class="num">5</span>Three tools with three different jobs</h2>
+    <p class="lede">People say “the tests failed” when they mean one of three unrelated things. Here is the difference.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 360" role="img" aria-label="Three panels: ruff tidies the writing, mypy checks the shapes, pytest checks the answers.">
+        <rect width="940" height="360" fill="#f8fafc" rx="14" stroke="#d7dde3"/>
+        <g>
+          <rect x="30" y="40" width="280" height="280" rx="16" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+          <text x="170" y="86" text-anchor="middle" font-size="30">🧹</text>
+          <text x="170" y="126" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="16" fill="#0f172a">ruff</text>
+          <text x="170" y="158" text-anchor="middle" font-size="14" fill="#334155">tidies the writing</text>
+          <text x="170" y="196" text-anchor="middle" font-size="13" fill="#64748b">unused names, spacing,</text>
+          <text x="170" y="218" text-anchor="middle" font-size="13" fill="#64748b">line length, tidy imports</text>
+          <text x="170" y="266" text-anchor="middle" font-size="13" fill="#64748b">does not run the code</text>
+          <text x="170" y="296" text-anchor="middle" font-size="13" fill="#15803d">“is it written cleanly?”</text>
+        </g>
+        <g>
+          <rect x="330" y="40" width="280" height="280" rx="16" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+          <text x="470" y="86" text-anchor="middle" font-size="30">📐</text>
+          <text x="470" y="126" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="16" fill="#0f172a">mypy</text>
+          <text x="470" y="158" text-anchor="middle" font-size="14" fill="#334155">checks the shapes</text>
+          <text x="470" y="196" text-anchor="middle" font-size="13" fill="#64748b">does every function get</text>
+          <text x="470" y="218" text-anchor="middle" font-size="13" fill="#64748b">the kind of value it expects?</text>
+          <text x="470" y="266" text-anchor="middle" font-size="13" fill="#64748b">does not run the code</text>
+          <text x="470" y="296" text-anchor="middle" font-size="13" fill="#15803d">“does it fit together?”</text>
+        </g>
+        <g>
+          <rect x="630" y="40" width="280" height="280" rx="16" fill="#fff" stroke="#2563eb" stroke-width="2"/>
+          <text x="770" y="86" text-anchor="middle" font-size="30">🧪</text>
+          <text x="770" y="126" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="16" fill="#0f172a">pytest</text>
+          <text x="770" y="158" text-anchor="middle" font-size="14" fill="#334155">checks the answers</text>
+          <text x="770" y="196" text-anchor="middle" font-size="13" fill="#64748b">runs the code and compares</text>
+          <text x="770" y="218" text-anchor="middle" font-size="13" fill="#64748b">numbers against the book</text>
+          <text x="770" y="266" text-anchor="middle" font-size="13" fill="#64748b">the only one that runs code</text>
+          <text x="770" y="296" text-anchor="middle" font-size="13" fill="#15803d">“is it correct?”</text>
+        </g>
+      </svg>
+      <figcaption>All three must pass before work is considered done. Two of them never execute the program — they only read it.</figcaption>
+    </figure>
+
+    <div class="note ok">
+      <p><strong>Live result on this repo right now:</strong> ruff clean, 17 files already formatted, mypy found no issues in 8 source files, 8 tests passed.</p>
+    </div>
+  </section>
+
+
+  <section id="tests">
+    <h2><span class="num">6</span>What a test actually is</h2>
+    <p class="lede">A test is a tiny program that says “if the code is right, this number must come out”. Nothing more.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 320" role="img" aria-label="A test file feeds a fixture into the calculation and compares the result with the number printed in the book.">
+        <rect width="940" height="320" fill="#0f172a" rx="14"/>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="13">
+          <rect x="30" y="40" width="230" height="240" rx="14" fill="#16233f" stroke="#2b3a57"/>
+          <text x="145" y="72" text-anchor="middle" fill="#7dd3fc">the input</text>
+          <text x="145" y="104" text-anchor="middle" fill="#dbe6ff">meeus_regulus</text>
+          <text x="145" y="128" text-anchor="middle" fill="#dbe6ff">_1999.toml</text>
+          <text x="145" y="170" text-anchor="middle" fill="#7f9bd1">the six numbers from</text>
+          <text x="145" y="192" text-anchor="middle" fill="#7f9bd1">the textbook, typed</text>
+          <text x="145" y="214" text-anchor="middle" fill="#7f9bd1">in once</text>
+          <rect x="355" y="40" width="230" height="240" rx="14" fill="#16233f" stroke="#2563eb" stroke-width="2"/>
+          <text x="470" y="72" text-anchor="middle" fill="#7dd3fc">the code</text>
+          <text x="470" y="104" text-anchor="middle" fill="#dbe6ff">calculate_star</text>
+          <text x="470" y="128" text-anchor="middle" fill="#dbe6ff">_local_circumstances</text>
+          <text x="470" y="170" text-anchor="middle" fill="#7f9bd1">the real program,</text>
+          <text x="470" y="192" text-anchor="middle" fill="#7f9bd1">called exactly as a</text>
+          <text x="470" y="214" text-anchor="middle" fill="#7f9bd1">user would call it</text>
+          <rect x="680" y="40" width="230" height="240" rx="14" fill="#16233f" stroke="#2b3a57"/>
+          <text x="795" y="72" text-anchor="middle" fill="#7dd3fc">the expected answer</text>
+          <text x="795" y="104" text-anchor="middle" fill="#dbe6ff">Δ = 1.152556</text>
+          <text x="795" y="128" text-anchor="middle" fill="#dbe6ff">P = 24.6654°</text>
+          <text x="795" y="170" text-anchor="middle" fill="#7f9bd1">printed in Meeus,</text>
+          <text x="795" y="192" text-anchor="middle" fill="#7f9bd1">copied by hand into</text>
+          <text x="795" y="214" text-anchor="middle" fill="#7f9bd1">the test file</text>
+        </g>
+        <g stroke="#94a3b8" stroke-width="2" fill="none">
+          <path d="M260 160 H350"/><path d="M585 160 H675"/>
+        </g>
+        <path d="M340 153 l12 7 -12 7 z" fill="#94a3b8"/>
+        <path d="M665 153 l12 7 -12 7 z" fill="#94a3b8"/>
+        <text x="470" y="306" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#7f9bd1">match → pass · differ → fail, and you know which number moved</text>
+      </svg>
+      <figcaption>The input lives in a <strong>fixture</strong> (a data file the test reads), so the same six numbers are never retyped across tests.</figcaption>
+    </figure>
+
+    <div class="grid g2">
+      <div class="card">
+        <span class="chip">Coverage</span>
+        <h3>“How much of the code did the tests touch?”</h3>
+        <p>Currently about <strong>92%</strong>. It is a flashlight, not a grade: it shows which lines were never exercised, not whether the exercised ones are correct.</p>
+      </div>
+      <div class="card">
+        <span class="chip violet">Regression test</span>
+        <h3>A test that guards one published result</h3>
+        <p>The Regulus case is a regression test. If a future change breaks the maths, that one test fails loudly instead of the error going unnoticed.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section id="git">
+    <h2><span class="num">7</span>Git: the undo history for a whole project</h2>
+    <p class="lede">Git saves snapshots. A <strong>branch</strong> is a line of snapshots you can experiment on without disturbing the main one.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 300" role="img" aria-label="A main branch line with a feature branch splitting off, carrying commits, and merging back.">
+        <rect width="940" height="300" fill="#f8fafc" rx="14" stroke="#d7dde3"/>
+        <line x1="60" y1="90" x2="880" y2="90" stroke="#94a3b8" stroke-width="3"/>
+        <line x1="300" y1="90" x2="300" y2="200" stroke="#94a3b8" stroke-width="3"/>
+        <line x1="300" y1="200" x2="700" y2="200" stroke="#2563eb" stroke-width="3"/>
+        <line x1="700" y1="200" x2="700" y2="90" stroke="#94a3b8" stroke-width="3"/>
+        <g fill="#ffffff" stroke="#475569" stroke-width="3">
+          <circle cx="120" cy="90" r="11"/><circle cx="220" cy="90" r="11"/><circle cx="780" cy="90" r="11"/>
+        </g>
+        <g fill="#2563eb">
+          <circle cx="380" cy="200" r="11"/><circle cx="500" cy="200" r="11"/><circle cx="620" cy="200" r="11"/>
+        </g>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#0f172a">
+          <text x="120" y="62" text-anchor="middle">main</text>
+          <text x="220" y="62" text-anchor="middle">develop</text>
+          <text x="780" y="62" text-anchor="middle">merged</text>
+          <text x="500" y="240" text-anchor="middle" fill="#2563eb">feat/meeus-star-local-circumstances</text>
+        </g>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#64748b">
+          <text x="380" y="176" text-anchor="middle">commit</text>
+          <text x="620" y="176" text-anchor="middle">commit</text>
+          <text x="60" y="286">a snapshot = the message + the exact contents of every file at that moment</text>
+        </g>
+      </svg>
+      <figcaption>This repo's current branch is <code>feat/meeus-star-local-circumstances</code>, which branched off <code>develop</code> and carries the milestone-0 work.</figcaption>
+    </figure>
+
+    <div class="grid g2">
+      <div class="card">
+        <span class="chip">Commit</span>
+        <h3>Saving a snapshot</h3>
+        <p>You choose which files go in. That is why <code>.gitignore</code> exists — it lists things that should never be saved: the virtual environment, caches, coverage reports.</p>
+      </div>
+      <div class="card">
+        <span class="chip">Pull request</span>
+        <h3>Asking before merging</h3>
+        <p>A PR says “here is my branch, please look”. CI runs the three checks on it, so a broken branch is caught before it reaches <code>main</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="ci">
+    <h2><span class="num">8</span>CI: a robot that runs the checks for you</h2>
+    <p class="lede">Every time code is pushed, a fresh computer with nothing installed repeats the whole setup and runs the checks.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 300" role="img" aria-label="A push triggers a fresh machine that installs uv, syncs the environment, then runs ruff, mypy and pytest.">
+        <rect width="940" height="300" fill="#0f172a" rx="14"/>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#dbe6ff">
+          <rect x="30" y="110" width="150" height="80" rx="12" fill="#16233f" stroke="#2b3a57"/>
+          <text x="105" y="146" text-anchor="middle">📤 push</text>
+          <text x="105" y="170" text-anchor="middle" fill="#7f9bd1">your branch</text>
+          <rect x="230" y="110" width="150" height="80" rx="12" fill="#16233f" stroke="#2b3a57"/>
+          <text x="305" y="146" text-anchor="middle">🖥 fresh machine</text>
+          <text x="305" y="170" text-anchor="middle" fill="#7f9bd1">nothing installed</text>
+          <rect x="430" y="110" width="150" height="80" rx="12" fill="#16233f" stroke="#2b3a57"/>
+          <text x="505" y="146" text-anchor="middle">⬇️ uv sync</text>
+          <text x="505" y="170" text-anchor="middle" fill="#7f9bd1">same lock file</text>
+          <rect x="630" y="110" width="280" height="80" rx="12" fill="#16233f" stroke="#2563eb" stroke-width="2"/>
+          <text x="770" y="146" text-anchor="middle">🧹 ruff · 📐 mypy · 🧪 pytest</text>
+          <text x="770" y="170" text-anchor="middle" fill="#7f9bd1">must all pass</text>
+        </g>
+        <g stroke="#94a3b8" stroke-width="2" fill="none">
+          <path d="M180 150 H225"/><path d="M380 150 H425"/><path d="M580 150 H625"/>
+        </g>
+        <g fill="#94a3b8">
+          <path d="M215 143 l12 7 -12 7 z"/><path d="M415 143 l12 7 -12 7 z"/><path d="M615 143 l12 7 -12 7 z"/>
+        </g>
+        <text x="470" y="60" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#7dd3fc">.github/workflows/ci.yml — 4 minutes of typing, saved forever</text>
+        <text x="470" y="250" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#7f9bd1">green ✅ → safe to merge · red ❌ → the branch is not ready</text>
+      </svg>
+      <figcaption>CI is not a second opinion; it is the same four commands you run locally, on a machine that has never seen your laptop.</figcaption>
+    </figure>
+
+    <div class="note warn">
+      <p><strong>Why beginners get bitten here:</strong> a check that passes locally but fails in CI almost always means a file was never committed, or the lock file was not updated. The robot only sees what Git has.</p>
+    </div>
+  </section>
+
+
+  <section id="layout">
+    <h2><span class="num">9</span>Why the folders are named that way</h2>
+    <p class="lede">Each top-level folder answers a different question. Nothing here is decoration.</p>
+
+    <figure>
+      <svg viewBox="0 0 940 400" role="img" aria-label="Six labelled cards describing src, tests, docs, data, local and the hidden tool folders.">
+        <rect width="940" height="400" fill="#f8fafc" rx="14" stroke="#d7dde3"/>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="14">
+          <rect x="30" y="30" width="280" height="150" rx="14" fill="#fff" stroke="#2563eb" stroke-width="2"/>
+          <text x="52" y="66" fill="#0f172a">📁 src/occultation/</text>
+          <text x="52" y="98" fill="#64748b" font-size="13">the program itself</text>
+          <text x="52" y="124" fill="#64748b" font-size="13">only thing that ships</text>
+          <rect x="330" y="30" width="280" height="150" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+          <text x="352" y="66" fill="#0f172a">📁 tests/</text>
+          <text x="352" y="98" fill="#64748b" font-size="13">proof the program is right</text>
+          <text x="352" y="124" fill="#64748b" font-size="13">mirrors src/ folder for folder</text>
+          <rect x="630" y="30" width="280" height="150" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+          <text x="652" y="66" fill="#0f172a">📁 docs/</text>
+          <text x="652" y="98" fill="#64748b" font-size="13">explainers, handoff, algorithms</text>
+          <text x="652" y="124" fill="#64748b" font-size="13">never imported by code</text>
+          <rect x="30" y="210" width="280" height="150" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+          <text x="52" y="246" fill="#0f172a">📁 data/</text>
+          <text x="52" y="278" fill="#64748b" font-size="13">small text fixtures + manifest</text>
+          <text x="52" y="304" fill="#64748b" font-size="13">big ephemeris files not here yet</text>
+          <rect x="330" y="210" width="280" height="150" rx="14" fill="#fff" stroke="#c2410c" stroke-width="2"/>
+          <text x="352" y="246" fill="#0f172a">📁 local/ (ignored)</text>
+          <text x="352" y="278" fill="#64748b" font-size="13">your scratch notes</text>
+          <text x="352" y="304" fill="#64748b" font-size="13">never committed, never shipped</text>
+          <rect x="630" y="210" width="280" height="150" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+          <text x="652" y="246" fill="#0f172a">📁 .github/ .venv/</text>
+          <text x="652" y="278" fill="#64748b" font-size="13">the robot's instructions</text>
+          <text x="652" y="304" fill="#64748b" font-size="13">and your private shelf</text>
+        </g>
+      </svg>
+      <figcaption><code>src/</code> and <code>tests/</code> mirror each other so a failing test points straight at the file to open.</figcaption>
+    </figure>
+
+    <div class="card">
+      <table>
+        <tr><th>You want to…</th><th>Go here</th></tr>
+        <tr><td>Understand the astronomy</td><td><a href="explainer.html">docs/explainer.html</a></td></tr>
+        <tr><td>Understand the code layout</td><td><a href="CODEBASE.md">docs/CODEBASE.md</a></td></tr>
+        <tr><td>Know the rules and constraints</td><td><code>docs/AGENT_HANDOFF.md</code></td></tr>
+        <tr><td>Change the maths</td><td><code>src/occultation/core/</code></td></tr>
+        <tr><td>Change what the command prints</td><td><code>src/occultation/cli.py</code></td></tr>
+        <tr><td>Add a new book example</td><td><code>tests/fixtures/</code> + <code>tests/reference_cases/</code></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section id="glossary">
+    <h2><span class="num">10</span>Ten words, decoded</h2>
+    <p class="lede">Every term you will meet in a Python project's README, in one line each.</p>
+
+    <div class="grid g2">
+      <div class="card"><h3>Package / module</h3><p>A folder of code / a single file of code.</p></div>
+      <div class="card"><h3>Virtual environment</h3><p>The project's private shelf of libraries (<code>.venv/</code>).</p></div>
+      <div class="card"><h3>Dependency</h3><p>Someone else's library your code borrows.</p></div>
+      <div class="card"><h3>Lock file</h3><p>The list of exact library versions so everyone gets the same shelf.</p></div>
+      <div class="card"><h3>Linter</h3><p>A tool that reads your code and points out sloppiness (ruff).</p></div>
+      <div class="card"><h3>Type checker</h3><p>A tool that checks values fit their declared kinds (mypy).</p></div>
+      <div class="card"><h3>Fixture</h3><p>A data file a test reads, so inputs are written down once.</p></div>
+      <div class="card"><h3>Regression test</h3><p>A test that freezes a known-good result so it cannot silently change.</p></div>
+      <div class="card"><h3>CI (continuous integration)</h3><p>A robot that reruns all the checks on a clean machine for every push.</p></div>
+      <div class="card"><h3>Console script</h3><p>The name you type in the terminal, wired to a function in the code.</p></div>
+    </div>
+
+    <div class="note">
+      <p><strong>Nothing else is required to read this repo.</strong> Everything above is standard Python practice; the only project-specific rules are the ones written down in <code>docs/AGENT_HANDOFF.md</code>.</p>
+    </div>
+  </section>
+
+
+  <section id="questions">
+    <h2><span class="num">11</span>Seven questions this repo raised</h2>
+    <p class="lede">The questions a real reader asked after reading the code, answered in the order they were asked. Each answer names the file that proves it. Jump straight to one: <a href="#q1">Q1</a> · <a href="#q2">Q2</a> · <a href="#q3">Q3</a> · <a href="#q4">Q4</a> · <a href="#q5">Q5</a> · <a href="#q6">Q6</a> · <a href="#q7">Q7</a></p>
+
+    <div class="card">
+      <h3 id="q1">Q1 — Why are the folders called <code>core</code> and <code>domain</code>? Is <code>core</code> “the core logic”, and is <code>domain</code> like a Java <code>struct</code>?</h3>
+      <p>Both names come from a well-known way of organising code (the “hexagonal” or “ports and adapters” style). The split is not “important code” versus “unimportant code” — it is <strong>data shapes</strong> versus <strong>calculations</strong>:</p>
+      <table>
+        <tr><th>Folder</th><th>What lives there</th><th>In this repo</th></tr>
+        <tr><td class="mono">domain/</td><td>What the things <em>are</em>: named values, their units, and the rules for a valid value. No astronomy maths.</td><td><code>ObserverLocation</code>, <code>StarOccultationElements</code>, <code>StarOccultationResult</code></td></tr>
+        <tr><td class="mono">core/</td><td>What the project <em>does</em>: the formulas, implemented by this project rather than borrowed from a library.</td><td><code>calculate_geocentric_observer</code>, <code>calculate_star_local_circumstances</code></td></tr>
+      </table>
+      <p>“Core” is indeed “the core logic” — with a sharp edge: <code>core/</code> holds the <em>custom</em> logic, the maths this project is learning to write. The reference engine (Skyfield) will be its opposite number, and <code>core/</code> is forbidden to import it.</p>
+      <p>“Domain” is <em>not</em> like a Java <code>struct</code>, though it looks similar at first glance. A <code>struct</code> is a passive bag of fields. These are <strong>frozen dataclasses with validation</strong>:</p>
+      <pre><code>@dataclass(frozen=True, slots=True)
+class ObserverLocation:
+    longitude_deg_east: float
+    latitude_deg: float
+    elevation_m: float
+
+    def __post_init__(self) -&gt; None:
+        if not -180.0 &lt;= self.longitude_deg_east &lt;= 180.0:
+            raise ValueError("longitude_deg_east must be between -180 and 180")</code></pre>
+      <ul class="tight">
+        <li><code>frozen=True</code> — once created it cannot be modified (no accidental <code>observer.latitude_deg = 99</code>).</li>
+        <li><code>slots=True</code> — no new fields can be bolted on at runtime, and it uses less memory.</li>
+        <li><code>__post_init__</code> — the object <em>refuses to exist</em> in an invalid state. A Java <code>struct</code> would happily hold latitude 999.</li>
+      </ul>
+      <p>The closest Java analogy is therefore not <code>struct</code> but a <strong>record with a validating constructor</strong>: an immutable value object. The point of the folder is that <em>every</em> number in this project has one home, one spelling, and one set of rules — units live in the field names (<code>_deg_east</code>, <code>_m</code>, <code>_earth_radii</code>) so a reader can never confuse degrees with radians.</p>
+    </div>
+
+    <div class="card">
+      <h3 id="q2">Q2 — <code>ObserverLocation</code> is east-positive, but Meeus (and the fixture) use west-positive longitude. Where is the conversion?</h3>
+      <p>Your reading is correct on both counts, and the conversion is real — it is written as a <strong>sign flip inside the formula</strong> rather than as a separate “convert” function.</p>
+      <p>Meeus writes the local hour angle as <code>H = H0 + H1·t − λ − ΔT/239.345</code>, where his λ is <em>west</em>-positive. The project stores east-positive longitude, so <code>− λ_west = + longitude_deg_east</code>, and the term becomes a plus. That is the whole conversion, documented at the exact line that performs it (<code>core/local_circumstances.py</code>):</p>
+      <pre><code>def _local_hour_angle_deg(...) -&gt; float:
+    """Return H = H0 + H1 t - lambda - Delta T / 239.345 in degrees.
+
+    Meeus writes ``- lambda`` where lambda is the *west*-positive longitude;
+    our domain uses the conventional east-positive longitude, so that term
+    becomes ``+ longitude_deg_east``.
+    """
+    return (
+        elements.greenwich_hour_angle_at_reference_deg
+        + elements.greenwich_hour_angle_rate_deg_per_hour * hours_after_reference
+        + longitude_deg_east                    # &lt;-- the sign flip lives here
+        - delta_t_seconds / DELTA_T_SECONDS_PER_DEGREE_OF_HOUR_ANGLE
+    )</code></pre>
+      <p>The fixture performs the same flip on the input side, in a comment a human reads:</p>
+      <pre><code># Project convention: east positive. Meeus prints 116.8640 degrees west.
+longitude_deg_east = -116.8640</code></pre>
+      <p>Two reasons it is done this way instead of with a <code>west_to_east()</code> helper:</p>
+      <ul class="tight">
+        <li><strong>One convention everywhere.</strong> The handoff rule is “east-positive longitude everywhere in code; convert at the boundary”. The boundary here is the printed page, read by a human, so the human flips the sign once and writes the comment.</li>
+        <li><strong>A helper would hide the arithmetic.</strong> A function that only negates a number adds a name without adding meaning, and it would move the <code>− λ → + λ</code> step away from the formula it belongs to. The docstring plus the regression test are the safety net.</li>
+      </ul>
+      <p><strong>How to prove it:</strong> the regression test feeds the flipped value and reproduces Meeus's printed answers (Δ = 1.152556, P = 24.6654°, h = 42.6499°). A sign handled wrongly would move the altitude and the separation away from the book. The test <em>is</em> the conversion's proof.</p>
+    </div>
+
+    <div class="card">
+      <h3 id="q3">Q3 — Why is there an <code>__init__.py</code> in both <code>domain/</code> and <code>core/</code>? Does that mean three packages?</h3>
+      <p>Yes — three packages, and that is intentional. Packages nest: <code>occultation</code> is a package, and <code>occultation.domain</code> and <code>occultation.core</code> are packages <em>inside</em> it. Every folder that should be importable carries its own marker file.</p>
+      <table>
+        <tr><th>File</th><th>Its contents here</th><th>What it declares</th></tr>
+        <tr><td class="mono">src/occultation/__init__.py</td><td>a docstring (176 bytes)</td><td>“<code>occultation</code> is a package”</td></tr>
+        <tr><td class="mono">src/occultation/domain/__init__.py</td><td>a docstring (58 bytes)</td><td>“<code>occultation.domain</code> is a package”</td></tr>
+        <tr><td class="mono">src/occultation/core/__init__.py</td><td>a docstring (69 bytes)</td><td>“<code>occultation.core</code> is a package”</td></tr>
+      </table>
+      <p>Two details worth knowing:</p>
+      <ul class="tight">
+        <li><strong>They are not empty here.</strong> Each holds a one-line docstring, so <code>help(occultation.core)</code> says what the folder is for. Empty is also legal, and older tutorials say “empty file”; this repo prefers the docstring.</li>
+        <li><strong>They are not the only way any more.</strong> Modern Python also allows a “namespace package” (a folder with no <code>__init__.py</code>). This repo does not use that, and the handoff treats the marker file as the convention — so keep adding one to every new package folder.</li>
+      </ul>
+      <p>The practical consequence: <code>import occultation.core.local_circumstances</code> works only because <em>every</em> folder along that path is a package. Delete one <code>__init__.py</code> and the import breaks.</p>
+    </div>
+
+    <div class="card">
+      <h3 id="q4">Q4 — Which five commands does uv combine into one, and what is the benefit over <code>conda</code> or plain <code>venv</code> if uv still creates a <code>.venv</code>?</h3>
+      <p>The six are listed in section 2 above; in one line each:</p>
+      <table>
+        <tr><th>Without uv</th><th>What it was doing</th></tr>
+        <tr><td class="mono">python3 -m venv .venv</td><td>create the private shelf</td></tr>
+        <tr><td class="mono">source .venv/bin/activate</td><td>remember to use it in this terminal</td></tr>
+        <tr><td class="mono">pip install -e .</td><td>install this project into it</td></tr>
+        <tr><td class="mono">pip install pytest-cov ruff mypy</td><td>install the developer tools</td></tr>
+        <tr><td class="mono">pip freeze &gt; requirements.txt</td><td>write down what got installed, by hand</td></tr>
+        <tr><td>(pyenv / brew / manual download)</td><td>get Python 3.12 in the first place</td></tr>
+      </table>
+      <p><code>uv sync --locked --dev</code> performs all of the first five, and <code>uv run &lt;command&gt;</code> removes the need for <code>activate</code> entirely: it runs the command inside the shelf without changing your shell. Fewer steps also means fewer ways to end up with a different environment than CI.</p>
+      <p><strong>Why the <code>.venv</code> still exists — and why that is the point.</strong> uv does not replace the idea of a virtual environment; it replaces the <em>chores around</em> one. The <code>.venv/</code> is what keeps the project's libraries separate from your laptop's system Python, and that separation is the thing you actually want. What uv adds on top:</p>
+      <ul class="tight">
+        <li><strong>A lock file.</strong> <code>uv.lock</code> (603 lines, 21 packages here) records the exact version of every library, indirect ones included. CI runs with <code>--locked</code>, so a version cannot drift unnoticed. <code>pip freeze</code> writes a list too, but nothing verifies it and nothing enforces it.</li>
+        <li><strong>It manages Python itself.</strong> <code>uv python install</code> fetches CPython 3.12.14; with venv you must install Python some other way first.</li>
+        <li><strong>Speed and no activation.</strong> Seconds, and <code>uv run</code> always uses the right interpreter.</li>
+      </ul>
+      <p><strong>uv versus conda:</strong> conda is not wrong, it answers a different question. Its real strength is shipping <em>non-Python</em> compiled libraries (GDAL, CUDA, compilers) as binaries. This project needs exactly one pure-Python runtime dependency (<code>skyfield</code>), so a lock file and a two-second sync fit better than a large solver and a second package ecosystem. Switching tools is also explicitly forbidden without asking first — reproducibility across laptop and CI is worth more here than personal preference.</p>
+    </div>
+
+    <div class="card">
+      <h3 id="q5">Q5 — What does mypy actually do? Python is dynamically typed, so a declared return type can still be violated at runtime.</h3>
+      <p>Your premise is exactly right and it is the key to understanding mypy: <strong>mypy does not run your code and it enforces nothing at runtime.</strong> It is a spell-checker for types. It reads the source, reasons about what each name can hold, and complains <em>before</em> anything runs. Python itself will still happily return the wrong type at 3 a.m.; mypy's job is to make that mistake impossible to write without a red squiggle.</p>
+      <p>A concrete example. Suppose someone edits the observer conversion and returns a string by accident:</p>
+      <pre><code>def calculate_geocentric_observer(
+    observer: ObserverLocation,
+) -&gt; GeocentricObserverCoordinates:
+    ...
+    return "rho sin phi' = 0.83"        # wrong type, but perfectly valid Python</code></pre>
+      <p>Running it changes nothing: the function returns a string, and the crash happens later, far from the cause. mypy points at the line immediately:</p>
+      <pre><code>error: Incompatible return value type
+       (got "str", expected "GeocentricObserverCoordinates")  [return-value]</code></pre>
+      <p>Two more examples of the same idea, both in this repo's style:</p>
+      <ul class="tight">
+        <li><strong>Wrong value is not a type error.</strong> <code>longitude_deg_east = "114.17"</code> (a string) is caught by mypy. But <code>longitude_deg_east = 114.17</code> when the field means <em>west</em>-positive degrees is not caught — mypy knows <code>float</code>, it does not know “degrees west”. That is why units live in the field names and why the tests exist: <em>types catch shape, tests catch meaning</em>.</li>
+        <li><strong>It forces the “impossible” branch to be handled.</strong> In <code>local_circumstances.py</code> the solver holds <code>relative_motion: RelativeMotion | None</code> while looping, then uses it after the loop. mypy insists the code prove the <code>None</code> case cannot reach that line; without the annotation it would have to guess, and guessing is where bugs hide.</li>
+      </ul>
+      <p><strong>What it buys this project:</strong> the domain layer is a set of small value objects passed between functions, so a wrong-shaped value is the most likely mistake. mypy catches that class of mistake for free on every commit. What it cannot buy is correct astronomy — a formula can be type-perfect and physically wrong, and only the Meeus regression test catches that.</p>
+      <p>Try it yourself: <code>uv run mypy src</code> (clean in this repo today).</p>
+    </div>
+
+    <div class="card">
+      <h3 id="q6">Q6 — What is <code>data/</code> for, and is <code>reference/</code> referenced anywhere? How would this be used technically?</h3>
+      <p><strong><code>data/</code> is the project's filing cabinet for external scientific data.</strong> Nothing in it is generated by the code; everything in it is <em>obtained</em>, and the rules are strict (handoff §3.3):</p>
+      <table>
+        <tr><th>Path</th><th>Purpose</th><th>State today</th></tr>
+        <tr><td class="mono">data/README.md</td><td>Explains the folder and the manifest rule</td><td>exists</td></tr>
+        <tr><td class="mono">data/manifest.json</td><td>One entry per dataset: source, version, date obtained, coverage, checksum, licence</td><td>exists, but declares zero datasets</td></tr>
+        <tr><td class="mono">data/external/</td><td>Local ephemeris files, e.g. <code>de440s.bsp</code> (1849–2150, 32 MB)</td><td><strong>does not exist yet</strong></td></tr>
+        <tr><td class="mono">data/coefficients/</td><td>Textbook coefficient tables kept as versioned data</td><td>planned</td></tr>
+        <tr><td class="mono">data/validation/</td><td>HKO / Occult extracts used as comparison targets</td><td>planned</td></tr>
+      </table>
+      <p>What makes it more than a folder: no runtime download (an ephemeris must never appear silently at startup), the file must be fetched by a deliberate separate step, its path must be explicit (<code>data/external/de440s.bsp</code>), and large files belong in an artifact store or Git LFS rather than normal Git history. <strong>Today the active work-package needs none of it:</strong> Meeus's method takes the Besselian elements as inputs copied from the printed tables, so there is no ephemeris to fetch.</p>
+      <p><strong>Is <code>reference/</code> referenced anywhere? No — and that is deliberate.</strong> Searching the tree for <code>reference</code> finds only documentation and the test folder name <code>tests/reference_cases/</code>, which means “cases taken from the reference book”, not “the reference engine”. Concretely:</p>
+      <ul class="tight">
+        <li><code>src/occultation/reference/</code> does not exist, nothing imports Skyfield, and the single declared runtime dependency is unused so far.</li>
+        <li>The handoff (§3.4) plans it as <code>reference/skyfield_engine.py</code>, added at milestone 1.</li>
+        <li>The rule is one-way: <code>core/</code> may never import <code>occultation.reference</code>. The reference engine may be a dependency of the comparison layer and of the application, never of the custom maths.</li>
+      </ul>
+      <p><strong>The intended technical usage, in order</strong> (handoff §3.2, §5.1, §11):</p>
+      <ol class="tight">
+        <li><strong>Now:</strong> the custom core computes from supplied elements, and the Meeus worked example is the oracle. No Skyfield, no data files.</li>
+        <li><strong>Milestone 1:</strong> add <code>reference/skyfield_engine.py</code> plus a local ephemeris fetched by <code>scripts/fetch_reference_data.py</code> and checked against <code>data/manifest.json</code> by <code>scripts/verify_reference_data.py</code>.</li>
+        <li><strong>Then:</strong> the comparison layer runs both engines on identical inputs and emits machine-readable differences (<code>event_type,date,custom_time,reference_time,error_seconds</code>) with max / median / 95th-percentile error and the known reasons for differences.</li>
+        <li><strong>Later:</strong> product-level validation against Hong Kong Observatory output (converted to <code>Asia/Hong_Kong</code>) and against Occult v4; then reference-engine responsibilities are replaced incrementally, while Skyfield stays available as an independent regression oracle.</li>
+      </ol>
+      <p>So the boundary is not decoration: it is what lets the project prove its own maths against a trusted engine, then retire that engine, without ever letting the two definitions of “correct” blur together.</p>
+    </div>
+
+    <div class="card">
+      <h3 id="q7">Q7 — Where do I look to check any of this myself?</h3>
+      <table>
+        <tr><th>Claim</th><th>Check it with</th></tr>
+        <tr><td>Three packages exist</td><td class="mono">ls src/occultation src/occultation/domain src/occultation/core</td></tr>
+        <tr><td>The east-positive sign flip</td><td class="mono">grep -n 'longitude_deg_east' src/occultation/core/local_circumstances.py</td></tr>
+        <tr><td>No reference engine yet</td><td class="mono">ls src/occultation ; grep -rn skyfield src/</td></tr>
+        <tr><td>The data manifest is empty</td><td class="mono">cat data/manifest.json</td></tr>
+        <tr><td>mypy is clean</td><td class="mono">uv run mypy src</td></tr>
+        <tr><td>The book's numbers reproduce</td><td class="mono">uv run pytest tests/reference_cases/test_meeus_regulus.py -q</td></tr>
+      </table>
+      <p>Every command above is run from the repository root.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Part 3 of 3 — the machinery behind the repo. Section 11 answers the seven questions the code raised.<br>
+    Part 1 is <a href="explainer.html">docs/explainer.html</a> (the astronomy). Part 2 is <a href="CODEBASE.md">docs/CODEBASE.md</a> (the code tour).</p>
+  </footer>
+
+</div>
+</body>
+</html>
