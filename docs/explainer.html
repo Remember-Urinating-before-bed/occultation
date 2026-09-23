@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Occultation — explained with pictures</title>
+<style>
+  :root {
+    --ink: #12161f; --ink-soft: #4a5568; --paper: #f7f5ef; --card: #ffffff;
+    --line: #d9d4c7; --night: #0b1020; --star: #ffd76e; --accent: #2f6feb;
+    --accent-soft: #e7efff; --warn: #d9603b; --warn-soft: #fdece6;
+    --ok: #2f8f5b; --ok-soft: #e6f6ec;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 22px 90px; }
+  header.hero {
+    background: radial-gradient(circle at 78% 18%, #1d2a52 0%, var(--night) 55%, #05070f 100%);
+    color: #fff; padding: 74px 22px 62px; position: relative; overflow: hidden;
+  }
+  header.hero .inner { max-width: 1000px; margin: 0 auto; position: relative; z-index: 2; }
+  header.hero h1 { font-size: clamp(2.1rem, 5.4vw, 3.5rem); margin: 0 0 10px; letter-spacing: -0.02em; line-height: 1.05; }
+  header.hero p { font-size: clamp(1rem, 2.3vw, 1.3rem); color: #c9d3ee; margin: 0; max-width: 640px; }
+  header.hero .kicker {
+    display: inline-block; font-size: .78rem; letter-spacing: .16em; text-transform: uppercase;
+    color: #8fa4d8; border: 1px solid #2c3a63; border-radius: 999px; padding: 6px 14px; margin-bottom: 22px;
+  }
+  .hero-sky { position: absolute; inset: 0; z-index: 1; opacity: .9; }
+  section { padding: 62px 0 8px; border-top: 1px solid var(--line); margin-top: 54px; }
+  section:first-of-type { border-top: 0; }
+  .num {
+    display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+    border-radius: 50%; background: var(--ink); color: #fff; font-size: .95rem; font-weight: 700;
+    margin-right: 12px; flex: none;
+  }
+  h2 { display: flex; align-items: center; font-size: clamp(1.4rem, 3.2vw, 1.95rem); margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 + .lede { color: var(--ink-soft); font-size: 1.06rem; margin: 0 0 30px 46px; }
+  h3 { font-size: 1.06rem; margin: 0 0 6px; }
+  p { margin: 0 0 14px; }
+  .big { font-size: clamp(1.15rem, 2.6vw, 1.5rem); font-weight: 600; line-height: 1.35; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px;
+    box-shadow: 0 1px 2px rgba(20,25,40,.05);
+  }
+  .grid { display: grid; gap: 18px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 780px) { .g2, .g3 { grid-template-columns: 1fr; } }
+  figure { margin: 0 0 8px; }
+  figure svg { width: 100%; height: auto; display: block; border-radius: 14px; }
+  figcaption { color: var(--ink-soft); font-size: .92rem; margin-top: 10px; }
+  .chip {
+    display: inline-block; font-size: .8rem; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+    background: var(--accent-soft); color: #1b4bb8; margin-bottom: 10px;
+  }
+  .chip.warn { background: var(--warn-soft); color: #a63f21; }
+  .chip.ok { background: var(--ok-soft); color: #1f6b42; }
+  .arrow-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .arrow-row .card { flex: 1 1 190px; text-align: center; }
+  .arrow-row .arrow { font-size: 1.7rem; color: var(--ink-soft); }
+  .arrow-row .card .icon { font-size: 1.9rem; display: block; margin-bottom: 6px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: .96rem; }
+  .kv dt { font-weight: 700; }
+  .kv dd { margin: 0; color: var(--ink-soft); }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: .9em; }
+  code { background: #efece3; padding: 2px 6px; border-radius: 5px; }
+  pre { background: var(--night); color: #dfe6ff; padding: 18px 20px; border-radius: 14px; overflow-x: auto; font-size: .88rem; line-height: 1.55; margin: 0 0 14px; }
+  pre code { background: none; padding: 0; color: inherit; }
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; margin: 0 0 10px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+  tr:last-child td { border-bottom: 0; }
+  .note { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 14px 18px; border-radius: 0 12px 12px 0; margin: 0 0 14px; }
+  .note.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .note.ok { border-color: var(--ok); background: var(--ok-soft); }
+  .note p:last-child { margin-bottom: 0; }
+  ul.tight { margin: 0 0 14px; padding-left: 22px; }
+  ul.tight li { margin-bottom: 6px; }
+  footer { text-align: center; color: var(--ink-soft); font-size: .9rem; padding: 50px 0 0; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+
+<header class="hero">
+  <svg class="hero-sky" viewBox="0 0 1000 420" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <radialGradient id="moonGrad" cx="36%" cy="32%" r="72%">
+        <stop offset="0%" stop-color="#ffffff"/><stop offset="60%" stop-color="#d8d4c8"/><stop offset="100%" stop-color="#8f8b82"/>
+      </radialGradient>
+      <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ffd76e" stop-opacity=".55"/><stop offset="100%" stop-color="#ffd76e" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <circle cx="120" cy="70" r="2.2" fill="#fff" opacity=".8"/>
+    <circle cx="260" cy="180" r="1.6" fill="#fff" opacity=".55"/>
+    <circle cx="420" cy="60" r="1.9" fill="#fff" opacity=".7"/>
+    <circle cx="600" cy="150" r="1.5" fill="#fff" opacity=".5"/>
+    <circle cx="880" cy="90" r="2.1" fill="#fff" opacity=".75"/>
+    <circle cx="760" cy="300" r="1.7" fill="#fff" opacity=".5"/>
+    <circle cx="960" cy="330" r="1.4" fill="#fff" opacity=".4"/>
+    <circle cx="180" cy="330" r="1.6" fill="#fff" opacity=".45"/>
+    <circle cx="700" cy="150" r="120" fill="url(#glow)"/>
+    <circle cx="700" cy="150" r="86" fill="url(#moonGrad)"/>
+    <circle cx="668" cy="126" r="15" fill="#b9b4a8" opacity=".55"/>
+    <circle cx="736" cy="182" r="10" fill="#b9b4a8" opacity=".45"/>
+    <circle cx="712" cy="118" r="7" fill="#b9b4a8" opacity=".4"/>
+    <circle cx="700" cy="150" r="6" fill="#ffd76e"/>
+  </svg>
+  <div class="inner">
+    <span class="kicker">A learning project · Hong Kong</span>
+    <h1>The Moon<br>blots out a star</h1>
+    <p>That is all this project is about — and everything it takes to predict it. No astronomy background needed. Start here.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section id="what">
+    <h2><span class="num">1</span>What is an occultation?</h2>
+    <p class="lede">One object passes in front of another and hides it. That is the whole idea.</p>
+
+    <figure>
+      <svg viewBox="0 0 900 300" role="img" aria-label="A star disappears behind the Moon, then reappears on the other side.">
+        <rect width="900" height="300" fill="#0b1020" rx="14"/>
+        <defs>
+          <radialGradient id="mg2" cx="34%" cy="30%" r="74%">
+            <stop offset="0%" stop-color="#ffffff"/><stop offset="62%" stop-color="#d8d4c8"/><stop offset="100%" stop-color="#8f8b82"/>
+          </radialGradient>
+        </defs>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="15" fill="#8fa4d8">
+          <text x="70" y="42">1 · before</text>
+          <text x="392" y="42">2 · hidden</text>
+          <text x="712" y="42">3 · after</text>
+        </g>
+        <circle cx="150" cy="165" r="62" fill="url(#mg2)"/>
+        <circle cx="252" cy="150" r="22" fill="#ffd76e" opacity=".18"/>
+        <circle cx="252" cy="150" r="7" fill="#ffd76e"/>
+        <text x="150" y="268" text-anchor="middle" fill="#c9d3ee" font-family="ui-monospace, Menlo, monospace" font-size="14">star is clear of the Moon</text>
+        <circle cx="470" cy="165" r="62" fill="url(#mg2)"/>
+        <circle cx="470" cy="150" r="7" fill="#ffd76e" opacity=".25"/>
+        <text x="470" y="268" text-anchor="middle" fill="#c9d3ee" font-family="ui-monospace, Menlo, monospace" font-size="14">the Moon covers it</text>
+        <circle cx="790" cy="165" r="62" fill="url(#mg2)"/>
+        <circle cx="688" cy="150" r="22" fill="#ffd76e" opacity=".18"/>
+        <circle cx="688" cy="150" r="7" fill="#ffd76e"/>
+        <text x="790" y="268" text-anchor="middle" fill="#c9d3ee" font-family="ui-monospace, Menlo, monospace" font-size="14">it pops back out</text>
+        <path d="M60 150 H840" stroke="#2c3a63" stroke-width="1" stroke-dasharray="2 8"/>
+      </svg>
+      <figcaption>The star does not move. The Moon does — it slides across the sky about its own width every hour, so it sweeps past the star and the star vanishes for a while.</figcaption>
+    </figure>
+
+    <div class="grid g3">
+      <div class="card">
+        <span class="chip">Every month</span>
+        <h3>Not rare</h3>
+        <p>The Moon circles the sky once a month and passes in front of many stars. From any one city, some happen every week.</p>
+      </div>
+      <div class="card">
+
+  <section id="why">
+    <h2><span class="num">2</span>Why would anyone compute this?</h2>
+    <p class="lede">Because the answer is a <em>time</em>, and a time is easy to check.</p>
+
+    <div class="grid g2">
+      <div class="card">
+        <span class="chip">The question</span>
+        <p class="big">“From Hong Kong, at what time does the star disappear — and does it happen at all?”</p>
+        <p>That is what this program answers. One place, one star, one moment.</p>
+      </div>
+      <div class="card">
+        <span class="chip">The catch</span>
+        <p class="big">You cannot look it up for a star nobody has published.</p>
+        <p>So the goal is to compute it yourself, from the same textbook formulas observatories use — and to prove the answer is right.</p>
+      </div>
+    </div>
+
+    <div class="note">
+      <p><strong>How you prove it:</strong> a famous textbook (Jean Meeus, <em>Astronomical Tables</em>) contains a fully worked example — the star Regulus, on 1 March 1999, seen from Palomar Mountain. The book prints the answer. This project reproduces that answer to five decimal places, and that reproduction is a permanent automated test.</p>
+    </div>
+  </section>
+
+  <section id="how">
+    <h2><span class="num">3</span>How the calculation works</h2>
+    <p class="lede">Four ideas, in order. No formulas needed to follow along.</p>
+
+    <div class="grid g2">
+      <div class="card">
+        <span class="chip">Idea 1</span>
+        <h3>Flatten the sky onto a sheet of paper</h3>
+        <p>Imagine a giant flat sheet standing between the Earth and the Moon, at right angles to the Moon's shadow. Everything is projected onto that sheet. The Moon becomes a circle; the star becomes a dot.</p>
+        <p>The book calls this the <strong>fundamental plane</strong>.</p>
+      </div>
+      <div class="card">
+        <span class="chip">Idea 2</span>
+        <h3>Describe the Moon's shadow with six numbers</h3>
+        <p>On that sheet, where is the Moon's shadow centre, and how fast is it sliding? Three numbers describe the horizontal position, three the vertical. They are called <strong>Besselian elements</strong>.</p>
+        <p>This project takes them as given input — a later step will compute them.</p>
+      </div>
+      <div class="card">
+        <span class="chip">Idea 3</span>
+        <h3>Turn “where you stand” into the same sheet</h3>
+        <p>Your latitude, longitude and height become a point on the same sheet. Now the star, the Moon and you are all in one picture, and “is the star hidden?” is just “is the dot inside the circle?”</p>
+      </div>
+      <div class="card">
+        <span class="chip">Idea 4</span>
+        <h3>Slide time until they are closest</h3>
+        <p>Guess a time, measure the gap, jump to the moment the gap is smallest, repeat until the jump is tiny. Four rounds is enough. The smallest gap is the answer.</p>
+        <p>This is called the <strong>closest approach</strong>.</p>
+      </div>
+    </div>
+
+    <figure style="margin-top:26px">
+      <svg viewBox="0 0 900 340" role="img" aria-label="The Moon's shadow circle and the star's track on the fundamental plane; the star passes outside the circle, so there is no occultation.">
+        <rect width="900" height="340" fill="#0b1020" rx="14"/>
+        <g stroke="#1e2745" stroke-width="1">
+          <path d="M0 85 H900"/><path d="M0 170 H900"/><path d="M0 255 H900"/>
+          <path d="M150 0 V340"/><path d="M300 0 V340"/><path d="M450 0 V340"/><path d="M600 0 V340"/><path d="M750 0 V340"/>
+        </g>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#6d80b3">
+          <text x="18" y="24">the sheet (fundamental plane)</text>
+          <text x="820" y="330">x →</text>
+          <text x="18" y="330">y ↑</text>
+        </g>
+        <circle cx="470" cy="170" r="96" fill="#d8d4c8" opacity=".14"/>
+        <circle cx="470" cy="170" r="96" fill="none" stroke="#d8d4c8" stroke-width="2" stroke-dasharray="7 6"/>
+        <circle cx="470" cy="170" r="4" fill="#d8d4c8"/>
+        <text x="470" y="196" text-anchor="middle" fill="#d8d4c8" font-family="ui-monospace, Menlo, monospace" font-size="13">Moon's shadow</text>
+        <path d="M120 62 L840 118" stroke="#ffd76e" stroke-width="2.5"/>
+        <circle cx="120" cy="62" r="5" fill="#ffd76e"/>
+        <circle cx="840" cy="118" r="5" fill="#ffd76e"/>
+        <text x="126" y="52" fill="#ffd76e" font-family="ui-monospace, Menlo, monospace" font-size="13">the star's track</text>
+        <path d="M470 170 L470 74" stroke="#2f6feb" stroke-width="2"/>
+        <path d="M470 170 L462 74" stroke="#2f6feb" stroke-width="2"/>
+        <circle cx="466" cy="74" r="3.5" fill="#2f6feb"/>
+        <text x="486" y="66" fill="#8fb2ff" font-family="ui-monospace, Menlo, monospace" font-size="13">closest approach</text>
+        <text x="486" y="86" fill="#8fb2ff" font-family="ui-monospace, Menlo, monospace" font-size="13">gap &gt; 1 → miss</text>
+      </svg>
+      <figcaption>Here the star's track passes outside the Moon's circle: the star comes close but is never hidden. The blue line is the gap at the closest moment — bigger than one Moon radius, so the answer is “no occultation here”.</figcaption>
+    </figure>
+  </section>
+
+        <span class="chip">Blink</span>
+        <h3>Very fast</h3>
+        <p>The star does not fade. It goes out instantly and comes back instantly — usually within a minute or two.</p>
+      </div>
+      <div class="card">
+        <span class="chip">Where you stand</span>
+        <h3>Depends on you</h3>
+        <p>Move a few kilometres and the star may miss the Moon completely. That is why the answer is per-location.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="result">
+    <h2><span class="num">4</span>What the program actually prints</h2>
+    <p class="lede">Seven numbers and a yes/no. That is a complete answer.</p>
+
+    <div class="card">
+      <table>
+        <tr><th>What</th><th>Meaning in plain words</th></tr>
+        <tr><td class="mono">hours_after_reference</td><td>When it happens, counted from the reference moment in the tables.</td></tr>
+        <tr><td class="mono">universal_time_hour</td><td>The same moment on a world clock.</td></tr>
+        <tr><td class="mono">separation_in_moon_radii</td><td>The gap between star and Moon centre, measured in Moon-widths. Under 1 means hidden.</td></tr>
+        <tr><td class="mono">limb_clearance_in_moon_radii</td><td>How far past the Moon's edge the star passes. Negative means it went behind.</td></tr>
+        <tr><td class="mono">position_angle_deg</td><td>Where on the Moon's edge the star disappears — like a clock face.</td></tr>
+        <tr><td class="mono">altitude_deg</td><td>How high the star is above your horizon. Below zero, you cannot see it.</td></tr>
+        <tr><td class="mono">is_occultation</td><td>The yes/no answer for your location.</td></tr>
+      </table>
+    </div>
+
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <span class="chip ok">The worked example</span>
+        <h3>Regulus, 1 March 1999, Palomar</h3>
+        <p>The book's own example, and this project's test case:</p>
+        <ul class="tight">
+          <li>gap: <strong>1.1526</strong> Moon-widths</li>
+          <li>clearance: <strong>+0.1526</strong> Moon-widths</li>
+          <li>angle: <strong>24.67°</strong></li>
+          <li>altitude: <strong>+43°</strong> (visible)</li>
+          <li>hidden? <strong>No</strong> — it misses by about 2 arcminutes</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="chip warn">Honest limits</span>
+        <h3>What this version does <em>not</em> do yet</h3>
+        <ul class="tight">
+          <li>It does not compute the Besselian elements — you supply them.</li>
+          <li>It gives the closest approach, not the exact start and end of the hiding.</li>
+          <li>It assumes the Moon is a smooth ball; real craters shift the edge.</li>
+          <li>It is not observation-grade. Do not plan a telescope night with it.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="code">
+    <h2><span class="num">5</span>Where that lives in the code</h2>
+    <p class="lede">Five small files do the whole job. Everything else is packaging and proof.</p>
+
+    <div class="arrow-row">
+      <div class="card"><span class="icon">📄</span><h3>elements + your location</h3><p class="mono" style="font-size:.82rem;color:#4a5568">StarOccultationElements<br>ObserverLocation</p></div>
+      <div class="arrow">→</div>
+      <div class="card"><span class="icon">🌍</span><h3>you, as a point on the sheet</h3><p class="mono" style="font-size:.82rem;color:#4a5568">observer_coordinates.py</p></div>
+      <div class="arrow">→</div>
+      <div class="card"><span class="icon">🔁</span><h3>slide time to closest approach</h3><p class="mono" style="font-size:.82rem;color:#4a5568">local_circumstances.py</p></div>
+      <div class="arrow">→</div>
+      <div class="card"><span class="icon">✅</span><h3>the answer</h3><p class="mono" style="font-size:.82rem;color:#4a5568">StarOccultationResult</p></div>
+    </div>
+
+    <div class="note" style="margin-top:20px">
+      <p>Full file-by-file tour, the rules the project follows, and the commands to run it: <a href="CODEBASE.md"><strong>docs/CODEBASE.md</strong></a>.</p>
+    </div>
+  </section>
+
+  <section id="words">
+    <h2><span class="num">6</span>Six words you will see</h2>
+    <p class="lede">Enough vocabulary to read the rest of the repository.</p>
+
+    <div class="card">
+      <dl class="kv">
+        <dt>Occultation</dt><dd>One body passing in front of another and hiding it.</dd>
+        <dt>Besselian elements</dt><dd>The numbers that say where the Moon's shadow is and how fast it moves, on the flat sheet.</dd>
+        <dt>Fundamental plane</dt><dd>That flat sheet. Everything is measured on it, in units of Earth's radius.</dd>
+        <dt>Closest approach</dt><dd>The moment the star and the Moon's centre are nearest, as seen from your spot.</dd>
+        <dt>Dynamical Time (TD)</dt><dd>A very steady clock used by the formulas. Subtract a small correction to get ordinary world time.</dd>
+        <dt>Ephemeris</dt><dd>A big data file of where the Moon and planets are at any moment. Not needed yet — this project currently starts from textbook tables.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section id="questions">
+    <h2><span class="num">7</span>Five more questions, answered</h2>
+    <p class="lede">Each one starts from the sentence that confused you, then draws it. Jump to one: <a href="#qa1">A1</a> · <a href="#qa2">A2</a> · <a href="#qa3">A3</a> · <a href="#qa4">A4</a> · <a href="#qa5">A5</a></p>
+
+    <div class="card" id="qa1">
+      <span class="chip">A1 · from Scenario 1</span>
+      <h3>“Stand on the star and look back” — where am I, and where is the Earth?</h3>
+      <p class="big">You are standing <em>on the star</em>, so the whole sky is behind your back. The Earth is in front of you, far away.</p>
+      <p>That is exactly right, and it is not a contradiction — it is the point. You have not moved to the Moon, and you have not moved to the Earth. You have moved to the <strong>star</strong>, which is the one thing in the picture that never moves.</p>
+      <p>Why bother? Because from your chair on Earth you cannot see the Moon move. The Moon takes about 50 minutes to travel its own width, so during the minute or two the star is hidden, the Moon looks frozen. From the star, though, the Moon is the thing that moves and the Earth is a big blue target it slides across. So you “change seats” to the place where the motion is visible.</p>
+
+      <figure>
+        <svg viewBox="0 0 900 300" role="img" aria-label="On the left, a person on the star with the Earth in front of them; on the right, the view from the star: the Earth as a disc with the Moon's shadow crossing it.">
+          <rect width="900" height="300" fill="#0b1020" rx="14"/>
+          <defs>
+            <radialGradient id="qEarth" cx="36%" cy="32%" r="72%">
+              <stop offset="0%" stop-color="#4d7fd6"/><stop offset="100%" stop-color="#1d3a6e"/>
+            </radialGradient>
+          </defs>
+          <g font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#8fa4d8">
+            <text x="40" y="34">1 · you, standing on the star</text>
+            <text x="520" y="34">2 · what you see: the Earth, head-on</text>
+          </g>
+          <circle cx="90" cy="170" r="9" fill="#ffd76e"/>
+          <text x="40" y="205" fill="#ffd76e">you here</text>
+          <text x="40" y="224" fill="#6d80b3" font-size="12">(the star)</text>
+          <path d="M104 170 H330" stroke="#2c3a63" stroke-width="1.5" stroke-dasharray="5 6"/>
+          <text x="150" y="152" fill="#6d80b3" font-size="12">your line of sight</text>
+          <circle cx="392" cy="170" r="52" fill="url(#qEarth)"/>
+          <text x="392" y="176" text-anchor="middle" font-size="12" fill="#cfe0ff">Earth</text>
+          <text x="392" y="246" text-anchor="middle" font-size="12" fill="#6d80b3">in front of you, far away</text>
+          <path d="M470 170 H520" stroke="#2c3a63" stroke-width="1.5"/>
+          <circle cx="700" cy="165" r="96" fill="url(#qEarth)"/>
+          <text x="700" y="172" text-anchor="middle" font-size="13" fill="#cfe0ff">O = Earth's centre</text>
+          <circle cx="700" cy="115" r="18" fill="#d8d4c8"/>
+          <text x="700" y="120" text-anchor="middle" font-size="11" fill="#3a3730">Moon</text>
+          <path d="M700 133 V262" stroke="#ffd76e" stroke-width="2" stroke-dasharray="6 6"/>
+          <text x="712" y="256" fill="#ffd76e" font-size="12">shadow axis</text>
+          <path d="M700 165 L700 133" stroke="#2f6feb" stroke-width="3"/>
+          <text x="712" y="150" fill="#8fb2ff" font-size="12">γ = OP</text>
+        </svg>
+        <figcaption>Left: you stand on the star, so the Earth is in front of you and the sky is behind you. Right: that is the picture the book draws — the Earth as a disc, and the Moon crawling across it dragging its shadow.</figcaption>
+      </figure>
+
+      <p><strong>“Like a torch beam.”</strong> The Moon is lit by the Sun, so it casts a shadow. That shadow is a long thin cone, and the line down the middle of it is the <strong>shadow axis</strong> — the beam. From the star you see that beam come straight at you, so on the picture it is a straight line crossing the Earth's disc.</p>
+      <dl class="why">
+        <dt>Where is the Sun in this picture?</dt>
+        <dd>Off to one side, lighting the Moon. The beam points away from the Sun, so it is not aimed at the star — it just happens to sweep across the Earth's disc while you watch.</dd>
+        <dt>Is the star really that close to the Earth?</dt>
+        <dd>No. The star is effectively infinitely far away, which is why the beam looks parallel to your line of sight and why the Earth appears as a flat disc rather than a ball. That is a convenience, not a lie: it makes the picture 2-D.</dd>
+      </dl>
+    </div>
+
+    <div class="card" id="qa2">
+      <span class="chip">A2 · from Scenario 6</span>
+      <h3>What is P?</h3>
+      <p class="big">P is a <strong>clock face on the Moon</strong>. It says which direction, from the Moon's centre, the star is — and therefore where on the Moon's edge the star disappears.</p>
+      <p>It is measured as an angle from the Moon's <em>North</em> point, turning towards <em>East</em>: 0° = straight up, 90° = right, 180° = straight down, 270° = left. The book prints it in degrees; the code returns the same number as <span class="mono">position_angle_deg</span>.</p>
+
+      <figure>
+        <svg viewBox="0 0 900 320" role="img" aria-label="Left: the Moon's centre with a star dot, and the two gaps u and v forming a right triangle. Right: the same angle drawn on the Moon's face like a clock, P measured from North towards East.">
+          <rect width="900" height="320" fill="#0b1020" rx="14"/>
+          <g font-family="ui-monospace, Menlo, monospace" font-size="13" fill="#8fa4d8">
+            <text x="40" y="34">1 · P is just “which way?”</text>
+            <text x="560" y="34">2 · the same P, on the Moon's face</text>
+          </g>
+          <circle cx="180" cy="180" r="70" fill="#d8d4c8" opacity=".22"/>
+          <circle cx="180" cy="180" r="4" fill="#d8d4c8"/>
+          <text x="150" y="206" fill="#c9d3ee" font-size="12">Moon's centre</text>
+          <circle cx="300" cy="110" r="7" fill="#ffd76e"/>
+          <text x="312" y="104" fill="#ffd76e">the star</text>
+          <path d="M180 180 H300" stroke="#2f6feb" stroke-width="3"/>
+          <text x="215" y="200" fill="#8fb2ff">u</text>
+          <path d="M300 180 V110" stroke="#2f6feb" stroke-width="3"/>
+          <text x="310" y="152" fill="#8fb2ff">v</text>
+          <path d="M180 180 L300 110" stroke="#ffd76e" stroke-width="3"/>
+          <path d="M300 160 H280 V180" fill="none" stroke="#6d80b3" stroke-width="1.6"/>
+          <text x="150" y="290" fill="#8fb2ff" font-size="13">tan P = u / v</text>
+          <text x="150" y="310" fill="#6d80b3" font-size="12">two gaps → one direction</text>
+
+          <circle cx="700" cy="180" r="86" fill="#d8d4c8" opacity=".9"/>
+          <path d="M700 94 V266" stroke="#3a3730" stroke-width="1.2" stroke-dasharray="4 4"/>
+          <path d="M614 180 H786" stroke="#3a3730" stroke-width="1.2" stroke-dasharray="4 4"/>
+          <text x="700" y="88" text-anchor="middle" fill="#3a3730" font-size="12">N</text>
+          <text x="796" y="184" fill="#3a3730" font-size="12">E</text>
+          <path d="M700 180 L700 132" stroke="#2f6feb" stroke-width="2"/>
+          <path d="M700 180 L740 148" stroke="#2f6feb" stroke-width="2"/>
+          <path d="M700 140 A40 40 0 0 1 730 155" fill="none" stroke="#2f6feb" stroke-width="2"/>
+          <text x="716" y="136" fill="#1b4bb8" font-size="13">P</text>
+          <circle cx="740" cy="148" r="6" fill="#ffd76e"/>
+          <text x="700" y="296" text-anchor="middle" fill="#3a3730" font-size="12">P = 24.67° from North, going East</text>
+          <text x="700" y="314" text-anchor="middle" fill="#6d80b3" font-size="12">the star touches the edge here</text>
+        </svg>
+        <figcaption>Left: the sideways gap u and the up-down gap v fix the direction. Right: that direction is P, read on the Moon's own face like a clock hand.</figcaption>
+      </figure>
+
+      <dl class="why">
+        <dt>Why does the book care about P?</dt>
+        <dd>Because “the star disappears at 24.7°” is something an observer can use: it says which side of the Moon to watch, and it is the number you compare against a photograph.</dd>
+        <dt>Why does the drawing look steeper than 24.7°?</dt>
+        <dd>The picture is exaggerated so the gap is visible. The real value is nearly “up, and a little to the right”; the regression test pins it at <span class="mono">P = 24.6654°</span> for Regulus on 1 March 1999.</dd>
+      </dl>
+    </div>
+
+    <div class="card" id="qa3">
+      <span class="chip">A3 · from Scenario 1</span>
+      <h3>Why does |γ| &gt; 1.270 mean nobody on Earth sees the occultation?</h3>
+      <p class="big">Because γ is the distance from the Earth's centre to the shadow beam, measured in Earth radii — and 1.270 is as far as the beam can be and still clip the Earth.</p>
+      <p>Read the number 1.270 as <em>1 Earth radius + 0.270 of another one</em>. The extra 0.270 is not decoration: it is the <strong>Moon's shadow radius</strong>, which is about 0.27 Earth radii. So 1.270 means “the beam's centre line is exactly far enough that the beam's <em>edge</em> just grazes the Earth's <em>edge</em>”. Beyond that, the whole beam misses.</p>
+
+      <figure>
+        <svg viewBox="0 0 900 340" role="img" aria-label="Three cases: the shadow beam near the Earth's centre, the beam grazing the edge at gamma 1.270, and the beam missing the Earth entirely beyond 1.270.">
+          <rect width="900" height="340" fill="#0b1020" rx="14"/>
+          <defs>
+            <radialGradient id="qEarth3" cx="36%" cy="32%" r="72%">
+              <stop offset="0%" stop-color="#4d7fd6"/><stop offset="100%" stop-color="#1d3a6e"/>
+            </radialGradient>
+          </defs>
+          <g font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#8fa4d8">
+            <text x="30" y="30">γ = 0.3 · hits</text>
+            <text x="330" y="30">γ = 1.270 · just grazes</text>
+            <text x="640" y="30">γ = 1.6 · misses</text>
+          </g>
+
+          <circle cx="140" cy="190" r="72" fill="url(#qEarth3)"/>
+          <path d="M60 150 H230" stroke="#ffd76e" stroke-width="2.5"/>
+          <path d="M60 158 H230" stroke="#ffd76e" stroke-width="1" opacity=".5"/>
+          <path d="M60 142 H230" stroke="#ffd76e" stroke-width="1" opacity=".5"/>
+          <circle cx="140" cy="190" r="4" fill="#fff"/>
+          <text x="120" y="214" fill="#cfe0ff" font-size="11">O</text>
+          <path d="M140 190 L140 150" stroke="#2f6feb" stroke-width="3"/>
+          <text x="150" y="176" fill="#8fb2ff">γ</text>
+          <text x="140" y="300" text-anchor="middle" fill="#7ee0a5" font-size="12">the beam crosses the disc</text>
+
+          <circle cx="450" cy="190" r="72" fill="url(#qEarth3)"/>
+          <path d="M370 108 H530" stroke="#ffd76e" stroke-width="2.5"/>
+          <path d="M370 116 H530" stroke="#ffd76e" stroke-width="1" opacity=".5"/>
+          <path d="M370 100 H530" stroke="#ffd76e" stroke-width="1" opacity=".5"/>
+          <circle cx="450" cy="190" r="4" fill="#fff"/>
+          <text x="430" y="214" fill="#cfe0ff" font-size="11">O</text>
+          <path d="M450 190 L450 108" stroke="#2f6feb" stroke-width="3"/>
+          <text x="460" y="150" fill="#8fb2ff">γ = 1.270</text>
+          <text x="450" y="300" text-anchor="middle" fill="#ffd76e" font-size="12">edge touches edge — one point on Earth</text>
+
+          <circle cx="760" cy="190" r="72" fill="url(#qEarth3)"/>
+          <path d="M680 66 H840" stroke="#ffd76e" stroke-width="2.5"/>
+          <path d="M680 74 H840" stroke="#ffd76e" stroke-width="1" opacity=".5"/>
+          <path d="M680 58 H840" stroke="#ffd76e" stroke-width="1" opacity=".5"/>
+          <circle cx="760" cy="190" r="4" fill="#fff"/>
+          <text x="740" y="214" fill="#cfe0ff" font-size="11">O</text>
+          <path d="M760 190 L760 66" stroke="#2f6feb" stroke-width="3"/>
+          <text x="770" y="120" fill="#8fb2ff">γ = 1.6</text>
+          <text x="760" y="300" text-anchor="middle" fill="#ffb0a0" font-size="12">nobody sees anything</text>
+        </svg>
+        <figcaption>γ is measured from the Earth's centre O to the nearest point of the beam. Up to 1.270 the beam still touches the Earth; past 1.270 it floats past, and the whole planet is missed.</figcaption>
+      </figure>
+
+      <p><strong>Where 1.270 comes from, in one line:</strong> Earth's radius (1) + the Moon's shadow radius (≈0.27). It is a <em>cheap filter</em>: before any trigonometry, one number tells the book “this event is visible somewhere on Earth” or “skip it”.</p>
+      <dl class="why">
+        <dt>Why is γ measured in Earth radii rather than kilometres?</dt>
+        <dd>Because then the Earth's edge is always at 1 and the Moon's shadow is always 0.27 — no unit conversions, and “does it hit?” is a comparison against 1.270.</dd>
+        <dt>Is 1.270 exact?</dt>
+        <dd>It is the book's working limit for occultations, printed as <span class="mono">|γ| &lt; 1.270</span>. It is a filter, not a precision result; the real answer comes from the full calculation.</dd>
+      </dl>
+    </div>
+
+    <div class="card" id="qa4">
+      <span class="chip">A4 · from Scenario 3</span>
+      <h3><span class="mono">x = X0 + X1·t + X2·t²</span> — what is each symbol, and why is there a t²?</h3>
+      <p class="big">X0 is where the Moon's dot is now. X1·t is how far it has slid. X2·t² is a small correction for the fact that the slide is not perfectly straight.</p>
+
+      <div class="card" style="box-shadow:none;border-color:var(--line)">
+        <table>
+          <tr><th>Symbol</th><th>Name</th><th>Meaning</th><th>Units</th></tr>
+          <tr><td class="mono">x</td><td>the dot's east–west position</td><td>Where the Moon's shadow pokes through the sheet, measured along the x-axis</td><td>Earth radii</td></tr>
+          <tr><td class="mono">X0</td><td>position at the reference instant</td><td>“Where the dot is at t = 0.” A single number from the book's table</td><td>Earth radii</td></tr>
+          <tr><td class="mono">X1</td><td>speed</td><td>How many Earth radii the dot slides per hour. The Moon's motion, almost constant</td><td>Earth radii / hour</td></tr>
+          <tr><td class="mono">t</td><td>time</td><td>Hours after the reference instant. Negative before it, positive after</td><td>hours</td></tr>
+          <tr><td class="mono">X2</td><td>curvature</td><td>A tiny correction applied to t² — the “slightly bent” part of the path</td><td>Earth radii / hour²</td></tr>
+        </table>
+      </div>
+      <p>There is an identical equation for y (north–south), with Y0, Y1, Y2. Together those six numbers are the <strong>Besselian elements</strong>: they pin down the dot and its motion completely.</p>
+
+      <figure>
+        <svg viewBox="0 0 900 320" role="img" aria-label="Left: a straight-line model of the Moon's track versus the real gently curved track. Right: the same track drawn as a bridge across the sheet, with X0, X1 and X2 labelled.">
+          <rect width="900" height="320" fill="#0b1020" rx="14"/>
+          <g font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#8fa4d8">
+            <text x="30" y="30">1 · straight line vs the real path</text>
+            <text x="520" y="30">2 · the Moon's track as a bridge</text>
+          </g>
+          <path d="M60 240 H420" stroke="#1e2745" stroke-width="1"/>
+          <path d="M60 240 V60" stroke="#1e2745" stroke-width="1"/>
+          <text x="404" y="262" fill="#6d80b3">x</text>
+          <text x="40" y="72" fill="#6d80b3">y</text>
+          <path d="M80 200 L400 120" stroke="#2f6feb" stroke-width="2" stroke-dasharray="6 5"/>
+          <text x="150" y="150" fill="#8fb2ff">X0 + X1·t only</text>
+          <path d="M80 200 Q240 150 400 128" stroke="#ffd76e" stroke-width="2.5" fill="none"/>
+          <text x="230" y="196" fill="#ffd76e">real path (X2 bends it)</text>
+          <circle cx="80" cy="200" r="5" fill="#d8d4c8"/>
+          <text x="60" y="224" fill="#c9d3ee">t = 0</text>
+          <text x="240" y="290" text-anchor="middle" fill="#6d80b3">the bend is small — but it decides the last digits</text>
+
+          <path d="M520 240 H860" stroke="#1e2745" stroke-width="1"/>
+          <path d="M520 240 V60" stroke="#1e2745" stroke-width="1"/>
+          <text x="844" y="262" fill="#6d80b3">x</text>
+          <text x="500" y="72" fill="#6d80b3">y</text>
+          <path d="M540 210 Q690 120 840 150" stroke="#ffd76e" stroke-width="3" fill="none"/>
+          <circle cx="540" cy="210" r="6" fill="#d8d4c8"/>
+          <text x="552" y="232" fill="#8fb2ff">X0</text>
+          <path d="M540 210 L640 186" stroke="#2f6feb" stroke-width="3"/>
+          <text x="560" y="180" fill="#8fb2ff">X1 = speed per hour</text>
+          <text x="700" y="112" fill="#ffd76e">the curve X2 corrects</text>
+          <text x="690" y="290" text-anchor="middle" fill="#6d80b3">a bridge over the sheet: it starts somewhere and spans it</text>
+        </svg>
+        <figcaption>Left: with only X0 and X1 the track is a ruler line; the real track bows slightly, and X2·t² is that bow. Right: the same track read as a bridge — a starting point (X0), a direction and speed (X1), and a gentle arc (X2).</figcaption>
+      </figure>
+
+      <dl class="why">
+        <dt>Why is t² the right fix, and not something bigger?</dt>
+        <dd>Because over the few hours an occultation lasts, the curvature is tiny. A parabola (a t² term) is the cheapest curve that can bend, so one extra number buys all the accuracy needed. Adding t³ would be inventing precision the tables do not have.</dd>
+        <dt>How big is the bend, really?</dt>
+        <dd>Small enough that the straight-line model gets you close, and large enough that the final digits of the answer depend on it. That is exactly why X2 exists: it is the difference between “roughly right” and “matches the book”.</dd>
+        <dt>Where does the code use this?</dt>
+        <dd><span class="mono">FundamentalPlanePolynomial.value_at(t)</span> evaluates it, and <span class="mono">rate_at(t)</span> evaluates its slope <span class="mono">X1 + 2·X2·t</span> — used by the solver to know how fast the gap is changing.</dd>
+      </dl>
+    </div>
+
+    <div class="card" id="qa5">
+      <span class="chip">A5 · from Scenario 3</span>
+      <h3>“The Moon moves like a bridge across the sheet” — what does that mean?</h3>
+      <p class="big">The sheet is a fixed map. The Moon is not on the map — it is a moving thing whose shadow <em>touches</em> the map at one point that keeps moving. That moving contact point is what “the Moon” means on the sheet.</p>
+      <p>Two pictures, and the difference matters:</p>
+      <ul class="tight">
+        <li><strong>The wrong picture:</strong> the Moon is a sticker lying on the sheet, sliding around on it like a puck. Then the sheet would be moving with it, and the Earth's centre O would be sliding too — nothing would be fixed, and the geometry would be useless.</li>
+        <li><strong>The right picture:</strong> the sheet is nailed to the Earth's centre and never moves. The Moon hangs above it and casts a dot onto it, the way a lamp hanging from a ceiling casts a dot on the floor as you carry it. The dot crosses the sheet; the sheet stays still.</li>
+      </ul>
+      <p>So “bridge” is a good word for the <em>track</em>: the dot enters the sheet at one edge, spans it, and leaves at the other — like a bridge across a river. The track is drawn on the sheet, but the Moon is the thing doing the moving.</p>
+
+      <figure>
+        <svg viewBox="0 0 900 320" role="img" aria-label="Left: the Moon above the fixed sheet, casting a dot onto it. Right: the dot's track drawn across the sheet like a bridge, with the sheet's edges marked.">
+          <rect width="900" height="320" fill="#0b1020" rx="14"/>
+          <g font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#8fa4d8">
+            <text x="30" y="30">1 · the Moon above, the sheet fixed</text>
+            <text x="520" y="30">2 · the dot's track, like a bridge</text>
+          </g>
+          <path d="M60 240 L360 240 L420 200 L120 200 Z" fill="#1b2547" stroke="#3a4a7d" stroke-width="1.5"/>
+          <text x="240" y="266" text-anchor="middle" fill="#8fa4d8">the sheet (nailed to O)</text>
+          <circle cx="240" cy="222" r="4" fill="#fff"/>
+          <text x="252" y="238" fill="#c9d3ee">O</text>
+          <circle cx="240" cy="110" r="34" fill="#d8d4c8"/>
+          <text x="240" y="80" text-anchor="middle" fill="#c9d3ee">Moon</text>
+          <path d="M240 144 V220" stroke="#ffd76e" stroke-width="2" stroke-dasharray="5 5"/>
+          <circle cx="240" cy="220" r="5" fill="#ffd76e"/>
+          <text x="256" y="200" fill="#ffd76e">the dot it casts</text>
+          <path d="M300 96 L340 92" stroke="#2f6feb" stroke-width="3"/>
+          <text x="300" y="130" fill="#8fb2ff">it moves…</text>
+          <text x="150" y="300" fill="#6d80b3">…so the dot slides, and the sheet does not</text>
+
+          <path d="M520 250 L860 250 L900 210 L560 210 Z" fill="#1b2547" stroke="#3a4a7d" stroke-width="1.5"/>
+          <text x="710" y="276" text-anchor="middle" fill="#8fa4d8">the sheet, from above</text>
+          <path d="M540 236 Q680 160 880 176" stroke="#ffd76e" stroke-width="3" fill="none"/>
+          <circle cx="540" cy="236" r="5" fill="#d8d4c8"/>
+          <text x="548" y="256" fill="#8fb2ff">enters</text>
+          <circle cx="880" cy="176" r="5" fill="#d8d4c8"/>
+          <text x="836" y="164" fill="#8fb2ff">leaves</text>
+          <circle cx="700" cy="196" r="16" fill="#d8d4c8" opacity=".28"/>
+          <circle cx="700" cy="196" r="16" fill="none" stroke="#d8d4c8" stroke-width="1.4" stroke-dasharray="5 4"/>
+          <text x="700" y="228" text-anchor="middle" fill="#c9d3ee">the Moon's circle, drawn at the dot</text>
+          <text x="710" y="306" text-anchor="middle" fill="#6d80b3">the track spans the sheet: a bridge, not a sticker</text>
+        </svg>
+        <figcaption>Left: the Moon hangs above a sheet that is nailed to the Earth's centre; what lands on the sheet is a dot. Right: that dot enters the sheet, crosses it, and leaves — the “bridge”. The circle around the dot is the Moon's size, k = 0.272495.</figcaption>
+      </figure>
+
+      <dl class="why">
+        <dt>Then what does the circle around the dot mean?</dt>
+        <dd>It is the Moon's outline drawn at the dot's position: radius k = 0.272495 Earth radii. The dot is the Moon's centre; the circle is its edge. “Is the star hidden?” becomes “is the star's dot inside this circle?”</dd>
+        <dt>Why is the sheet nailed to O?</dt>
+        <dd>Because then the Earth's centre is the origin of the coordinates, so every distance is directly comparable with the Earth's radius — which is why γ and k are both in Earth radii.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <footer>
+    <p>Part 1 of 2 — the topic. Part 2 is <a href="CODEBASE.md">docs/CODEBASE.md</a>, the code-base tour.<br>
+    A sentence that did not land? <a href="#questions">§7 answers five of them with pictures</a>.<br>
+    Authoritative engineering notes: <a href="AGENT_HANDOFF.md">docs/AGENT_HANDOFF.md</a> · Formula provenance: <a href="algorithms/meeus-star-local-circumstances.md">docs/algorithms/</a></p>
+  </footer>
+</div>
+</body>
+</html>
