@@ -30,7 +30,7 @@ Checked on 2026-03-09 in `/Users/workworkwork/Documents/repo/occultation`:
 | Dev dependencies | `mypy`, `pytest-cov`, `ruff` (pytest arrives transitively via `pytest-cov`) |
 | Git remote | `https://github.com/Remember-Urinating-before-bed/occultation.git` |
 | Branches | `main` (initial commit) and `develop` (HEAD, "Init python 3.12 project & gitlab ci" + 2 CI fixes) |
-| CI | GitHub Actions: `.github/workflows/ci.yml`. **There is no `gitlab-ci.yml` in this repository.** |
+| CI | GitHub Actions: `.github/workflows/ci.yml` (the primary pipeline) **and** GitLab CI: `.gitlab-ci.yml` (added 2026-09-23, one `quality` job, same gate). The old note that "there is no `gitlab-ci.yml`" is obsolete. |
 | Textbook PDF | `local/meeus_ocr/MeeusTables_Occultation.pdf` — git-ignored, image-only, 128 pages (see §8). Moved out of `src/occultation/` on 2026-03-09 (defect D8, fixed) |
 | `docs/` | Exists; `docs/AGENT_HANDOFF.md` (this file) and `docs/algorithms/meeus-star-local-circumstances.md` were added while closing milestone 0. It was empty before that |
 | Working tree | Milestone-0 work is present but **uncommitted**: repaired/re-typed files under `src/occultation/`, `tests/`, `docs/`, plus modified `AGENTS.md`, `pyproject.toml`, `config/locations/hong_kong.toml`, `src/occultation/__init__.py`, `tests/test_cli.py`. See Appendix B |
@@ -1066,9 +1066,9 @@ Add progressively:
 
 - non-root multi-stage Docker image;
 - CI stages for lint, type-check, tests, comparison, benchmark, build, and integration. **The
-  existing pipeline is GitHub Actions (`.github/workflows/ci.yml`), not GitLab** — extend that
-  workflow. GitLab remains a stated personal goal; treat it as a later mirror/second remote, and
-  keep the committed CI in sync with whatever actually exists.
+  primary pipeline is GitHub Actions (`.github/workflows/ci.yml`)** — extend that workflow. A
+  GitLab mirror pipeline now also exists (`.gitlab-ci.yml`, added 2026-09-23) and runs the same
+  gate; keep the two in sync, and keep the committed CI matching whatever actually exists.
 - dependency and container scanning;
 - structured JSON logs;
 - Prometheus metrics;
