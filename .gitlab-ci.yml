@@ -1,0 +1,62 @@
+stages:
+  - quality
+
+variables:
+  # Keep the uv cache inside the project directory so the GitLab cache can find it.
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.uv-cache"
+  # Pin the interpreter the lock file was resolved against.
+  UV_PYTHON: "3.12"
+
+# ---------------------------------------------------------------------------
+# Trigger rules: one pipeline per change, never two.
+#
+# GitLab does not have GitHub's "push + pull_request" double trigger, but the
+# naive configuration (a plain `push` job plus an `merge_request` job) does
+# produce two pipelines for one branch: one when the branch is pushed, and a
+# second when the merge request is opened or updated.
+#
+# The rules below use the documented pattern from
+# https://docs.gitlab.com/ee/ci/yaml/workflow.html#switch-between-branch-pipelines-and-merge-request-pipelines
+#   * a branch with no open merge request  -> branch pipeline  (push events)
+#   * a branch with an open merge request  -> merge request pipeline, and the
+#     branch pipeline is suppressed, so pushing to the branch runs exactly one.
+#
+# The rule set is deliberately identical for `push` and `merge_request_event`,
+# because `workflow:rules` is evaluated against both.
+# ---------------------------------------------------------------------------
+workflow:
+  rules:
+    # A merge request pipeline is the only pipeline a branch with an open MR gets.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Pushing to a branch that already has an open MR: suppressed, the MR
+    # pipeline above covers it. This is what keeps the count at one.
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    # Every other branch push runs a branch pipeline.
+    - if: '$CI_COMMIT_BRANCH'
+    # Tags, schedules, and manual runs still work.
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+# The same gate as .github/workflows/ci.yml, so a green GitHub check and a green
+# GitLab pipeline mean the same thing.
+quality:
+  stage: quality
+  image: ghcr.io/astral-sh/uv:0.12.7-python3.12-bookworm-slim
+  interruptible: true
+  cache:
+    key:
+      files:
+        - uv.lock
+    paths:
+      - .uv-cache/
+  before_script:
+    - uv --version
+  script:
+    - uv sync --locked --dev
+    - uv run python --version
+    - uv run ruff check .
+    - uv run ruff format --check .
+    - uv run mypy src
+    - uv run pytest --cov=occultation --cov-report=term-missing
