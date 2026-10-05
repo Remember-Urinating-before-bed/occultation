@@ -1,9 +1,11 @@
 # For review — a runnable occultation CLI, and proof that it matches the book
 
 **Audience:** anyone who wants to check the work without reading Python.
-**Branch:** `feat/cli-local-circumstances`, merged into `develop`; the planet
-branch (below) is on the working tree, uncommitted.
-**Date:** 2026-09-23 (star CLI); planet branch added 2026-10-06.
+**Branch:** `feat/planet-local-circumstances` (planet branch), based on
+`develop`; the earlier star CLI work is `feat/cli-local-circumstances`,
+merged into `develop`.
+**Date:** 2026-09-23 (star CLI); planet branch added 2026-10-06, reflector
+review added 2026-10-06 (§13).
 
 ---
 
@@ -80,7 +82,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy src
 ```
 
 Command 1 currently prints `VERDICT: matches ...` and exits `0`. Command 4
-currently prints `41 passed`, `All checks passed!`, `26 files already
+currently prints `45 passed`, `All checks passed!`, `28 files already
 formatted`, and `Success: no issues found in 13 source files`.
 
 ## 3. The actual output of `verify meeus-example-5`
@@ -331,7 +333,7 @@ elements are the book's Palomar example, reused for a site 11 000 km away.
 | `tests/fixtures/meeus_regulus_1999.json` | new | A JSON twin of the existing TOML fixture, carrying the book's printed values and the tolerances they justify. |
 | `tests/fixtures/meeus_mars_1997.{toml,json}` | new (2026-10-06) | The planet-branch fixture: Meeus Example 3 (Mars, 1997 November 12, Uccle), with `D1`, `F`, and the immersion/emersion contacts. |
 | `tests/reference_cases/test_meeus_mars.py` | new (2026-10-06) | The planet regression: closest approach, both contacts, and per-contact `is_visible`. |
-| `tests/test_cli.py` | extended | 4 tests before, 17 at the CLI change, 20 now: adds the `--body planet` text and JSON paths and the star-omits-contacts path. |
+| `tests/test_cli.py` | extended | 4 tests before, 17 at the CLI change, 20 now: adds the `--body planet` text and JSON paths, the per-contact visibility, and the star-omits-contacts path. |
 | `tests/unit/test_elements_file.py` | new | 8 tests for the elements loader. |
 | `tests/unit/test_location_file.py` | new | 7 tests for the site loader. |
 | `tests/unit/test_reference_engine.py` | new | 3 tests that the reference engine refuses to answer. |
@@ -511,7 +513,7 @@ $ uv run occultation local-circumstances --elements ...meeus_mars_1997.json \
                                                      -> exit 0, planet + contacts
 $ uv run pytest -q                                   -> 45 passed
 $ uv run ruff check .                                -> All checks passed!
-$ uv run ruff format --check .                       -> 27 files already formatted
+$ uv run ruff format --check .                       -> 28 files already formatted
 $ uv run mypy src                                    -> Success: no issues found in 13 source files
 $ uv run pytest --cov=occultation --cov-report=term-missing
                                                      -> TOTAL 90%
@@ -576,7 +578,98 @@ itself a test, so a transcription slip in either file fails the suite.
    fixture so the wheel is self-contained, and then start milestone 1 so the
    comparison block can carry a real difference.
 
-## 13. Where to read more
+## 13. Reflector review (experienced software and data engineer, 2026-10-06)
+
+This is a self-review of the planet-branch diff, written after the branch was
+pushed. It is deliberately adversarial: the point is to name the places where
+this code could mislead a future reader or fail silently, not to congratulate
+the parts that work. Findings are ordered by how much damage they could do, and
+each one says what to do about it.
+
+### 13.1 `is_planet` is a heuristic, not a fact (highest priority)
+
+`StarOccultationElements.is_planet` returns
+`declination_rate_deg_per_hour != 0.0 or aberration_term != 0.0`. That is a
+guess about intent inferred from a number. A planet whose tabulated `D1` happens
+to round to `0.0` — a body near a declination turning point — would be reported
+as a star. Today nothing branches on `is_planet` except display, so the blast
+radius is small, but it is exactly the kind of property that gets trusted later.
+**Recommendation:** if `is_planet` is ever to gate behaviour, replace it with an
+explicit field (or drive behaviour from the CLI's `body`), and keep the numeric
+short-circuit only as a documented fallback. Until then, note in the docstring
+that it is a display hint, not a classification.
+
+### 13.2 Float equality on `0.0` in the shadow-radius short-circuit
+
+`_effective_shadow_radius` returns `k` early when `aberration_term == 0.0`. The
+comparison is exact, which is safe *today* because `F` arrives as a literal or a
+JSON number. It stops being safe the moment `F` is computed from an ephemeris,
+where a mathematically-zero term can land on `1e-18` and silently take the other
+branch. **Recommendation:** either drop the short-circuit (the general formula
+already reduces to `k` when `F = 0`) or compare against a small epsilon with a
+comment explaining why exactness was assumed.
+
+### 13.3 `--body` and the numeric elements can disagree
+
+`--body` only decides whether contacts are computed and how the output is
+labelled; the physics is driven entirely by `D1` and `F`. So `--body star` with
+non-zero `D1`/`F` runs planet physics but prints "star", and `--body planet`
+with `D1 = F = 0` runs the star physics under a planet label. **Recommendation:**
+either derive the label from the elements, or validate that the flag and the
+numbers agree and reject the mismatch with a usage error — consistent with how
+the CLI already refuses to mix `--elements` with inline element options.
+
+### 13.4 A non-occulting `--body planet` run is silent
+
+When `result.is_occultation` is false, `_run_local_circumstances` skips the
+planet block and prints nothing about it. A user who asked for contacts gets an
+ordinary star-shaped answer with no explanation. **Recommendation:** emit a
+one-line note (stderr, or a `note` field in JSON) saying contacts were not
+computed because the body is not occulted at closest approach.
+
+### 13.5 Duplicated fixtures (TOML and JSON twins)
+
+Every example exists twice, hand-maintained. A test asserts the twins agree, so
+the duplication is checked rather than trusted — that is the right mitigation —
+but it is still two places to edit for every change. **Recommendation:** keep
+the equality test as the guard; if the duplication ever causes a real defect,
+promote one format to the source and generate the other.
+
+### 13.6 Tolerances are documentation, and should stay that way
+
+Encoding each tolerance next to the printed value it justifies, and defaulting in
+code, is a good pattern. The risk is that a failing test gets "fixed" by tuning a
+tolerance. **Recommendation:** keep the rule explicit in review — never tighten a
+tolerance below the precision the source prints, and never loosen one without
+citing a new printed digit.
+
+### 13.7 Coverage is measured but not enforced
+
+The suite reports ~90% coverage, but nothing fails the build when it drops. As
+the planet branch grows (one fixture per planet), it is easy to add paths that no
+test exercises. **Recommendation:** add `--cov-fail-under` to the CI gate at the
+current level so coverage can ratchet up but not silently down.
+
+### 13.8 What is genuinely good, and should not be "improved" away
+
+- **The reduction proof.** `D1 = F = 0` collapsing to the star path, with the
+  unchanged Regulus regression as the witness, is a real correctness argument,
+  not a claim. Keep it.
+- **Provenance discipline.** Printed page plus PDF page on every constant, OCR
+  demoted to a search index. This is the single most valuable habit in the
+  repository; the Jupiter increment must follow it exactly.
+- **Self-describing output.** Units and time scales in every key, `inputs` and
+  `derived` echoed, `is_visible` reported rather than implied. A stored result
+  answers "what was actually computed?" without the command that produced it.
+
+### 13.9 Verdict
+
+No blockers. 13.1 is the one item worth resolving before `is_planet` is relied
+on anywhere beyond display; the rest are hardening. The commit is safe to review
+as-is, and the next increment (the Hong Kong Jupiter sweep) should carry the
+provenance discipline of §13.8 forward.
+
+## 14. Where to read more
 
 | If you want... | Read |
 | --- | --- |
