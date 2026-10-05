@@ -26,12 +26,14 @@ from pathlib import Path
 from typing import Any
 
 from occultation.core.local_circumstances import (
+    calculate_planet_local_circumstances,
     calculate_star_local_circumstances,
 )
 from occultation.core.observer_coordinates import calculate_geocentric_observer
 from occultation.domain.observer import ObserverLocation
 from occultation.domain.occultation import (
     FundamentalPlanePolynomial,
+    PlanetOccultationResult,
     StarOccultationElements,
     StarOccultationResult,
 )
@@ -131,6 +133,16 @@ def _add_local_circumstances_parser(
     _add_element_arguments(parser)
     _add_observer_arguments(parser)
     parser.add_argument(
+        "--body",
+        choices=("star", "planet"),
+        default="star",
+        help=(
+            "star: a point at infinity, D1 = F = 0 (default); "
+            "planet: use the planet-only declination rate and aberration term, "
+            "and also report the immersion and emersion contacts"
+        ),
+    )
+    parser.add_argument(
         "--delta-t-seconds",
         type=float,
         required=True,
@@ -229,6 +241,23 @@ def _add_element_arguments(parser: argparse.ArgumentParser) -> None:
             f"{DEFAULT_MOON_SHADOW_RADIUS_EARTH_RADII})"
         ),
     )
+    parser.add_argument(
+        "--declination-rate-deg-per-hour",
+        type=float,
+        default=0.0,
+        metavar="DEG",
+        help="hourly rate D1 of the body's declination (0 for a star, default: 0)",
+    )
+    parser.add_argument(
+        "--aberration-term",
+        type=float,
+        default=0.0,
+        metavar="F",
+        help=(
+            "planetary aberration term F from Table III (0 for a star, "
+            "default: 0); the effective radius becomes L = k - zeta F / 1e6"
+        ),
+    )
 
 
 def _add_observer_arguments(parser: argparse.ArgumentParser) -> None:
@@ -316,6 +345,19 @@ def _run_local_circumstances(arguments: argparse.Namespace) -> int:
         tolerance_hours=arguments.tolerance_hours,
         max_iterations=arguments.max_iterations,
     )
+    # A planet also has immersion and emersion contacts; a star has only the
+    # closest approach, so its contacts stay None and are never printed.
+    planet_result = (
+        calculate_planet_local_circumstances(
+            elements=elements,
+            observer=observer,
+            delta_t_seconds=arguments.delta_t_seconds,
+            convergence_tolerance_hours=arguments.tolerance_hours,
+            max_iterations=arguments.max_iterations,
+        )
+        if arguments.body == "planet" and result.is_occultation
+        else None
+    )
     comparison = _comparison_block(
         arguments.engine, elements=elements, observer=observer
     )
@@ -328,12 +370,13 @@ def _run_local_circumstances(arguments: argparse.Namespace) -> int:
                     delta_t_seconds=arguments.delta_t_seconds,
                     result=result,
                     comparison=comparison,
+                    planet_result=planet_result,
                 ),
                 indent=2,
             )
         )
     else:
-        print(_format_result(elements, observer, result, comparison))
+        print(_format_result(elements, observer, result, comparison, planet_result))
     return EXIT_OK
 
 
@@ -428,6 +471,8 @@ def _resolve_elements(arguments: argparse.Namespace) -> StarOccultationElements:
             quadratic_term_per_hour_squared=arguments.shadow_y2,
         ),
         moon_shadow_radius_earth_radii=arguments.shadow_radius_earth_radii,
+        declination_rate_deg_per_hour=arguments.declination_rate_deg_per_hour,
+        aberration_term=arguments.aberration_term,
     )
 
 
@@ -509,10 +554,16 @@ def _comparison_block(
 
 
 def _result_payload(result: StarOccultationResult) -> dict[str, Any]:
-    """The result as a JSON-ready mapping, with the derived property included."""
+    """The result as a JSON-ready mapping, with the derived properties included."""
     payload = asdict(result)
     payload["limb_clearance_in_moon_radii"] = result.limb_clearance_in_moon_radii
+    payload["is_visible"] = result.is_visible
     return payload
+
+
+def _contact_payload(contact: Any) -> dict[str, Any]:
+    """A contact as a JSON-ready mapping (name, times, P, h, visibility)."""
+    return asdict(contact)
 
 
 def _result_document(
@@ -522,6 +573,7 @@ def _result_document(
     delta_t_seconds: float,
     result: StarOccultationResult,
     comparison: dict[str, Any] | None,
+    planet_result: PlanetOccultationResult | None = None,
 ) -> dict[str, Any]:
     geocentric = calculate_geocentric_observer(observer)
     document: dict[str, Any] = {
@@ -537,6 +589,10 @@ def _result_document(
                 "greenwich_hour_angle_rate_deg_per_hour": (
                     elements.greenwich_hour_angle_rate_deg_per_hour
                 ),
+                "declination_rate_deg_per_hour": (
+                    elements.declination_rate_deg_per_hour
+                ),
+                "aberration_term": elements.aberration_term,
                 "moon_shadow_x": asdict(elements.moon_shadow_x),
                 "moon_shadow_y": asdict(elements.moon_shadow_y),
                 "moon_shadow_radius_earth_radii": (
@@ -552,6 +608,11 @@ def _result_document(
         },
         "result": _result_payload(result),
     }
+    if planet_result is not None:
+        document["contacts"] = {
+            "immersion": _contact_payload(planet_result.immersion),
+            "emersion": _contact_payload(planet_result.emersion),
+        }
     if comparison is not None:
         document["comparison"] = comparison
     return document
@@ -562,10 +623,12 @@ def _format_result(
     observer: ObserverLocation,
     result: StarOccultationResult,
     comparison: dict[str, Any] | None,
+    planet_result: PlanetOccultationResult | None = None,
 ) -> str:
     geocentric = calculate_geocentric_observer(observer)
+    body_label = "planet" if planet_result is not None else "star"
     lines = [
-        "Local circumstances of a lunar occultation of a star",
+        f"Local circumstances of a lunar occultation of a {body_label}",
         "algorithm: Meeus, Astronomical Tables, printed pp. 224-226 (custom core)",
         (
             f"observer : {observer.latitude_deg:+.4f} deg N, "
@@ -579,6 +642,10 @@ def _format_result(
             f"H1 = {elements.greenwich_hour_angle_rate_deg_per_hour:.5f} deg/h, "
             f"k = {elements.moon_shadow_radius_earth_radii:.6f}"
         ),
+        (
+            f"           D1 = {elements.declination_rate_deg_per_hour:+.5f} deg/h, "
+            f"F = {elements.aberration_term:.2f}"
+        ),
         "",
         f"rho sin phi'          {geocentric.rho_sin_geocentric_latitude:+.6f}",
         f"rho cos phi'          {geocentric.rho_cos_geocentric_latitude:+.6f}",
@@ -590,8 +657,30 @@ def _format_result(
         f"P (position angle)    {result.position_angle_deg:.2f} deg",
         f"h (altitude)          {result.altitude_deg:+.2f} deg",
         f"occulted?             {'yes' if result.is_occultation else 'no'}",
+        f"visible?              {'yes' if result.is_visible else 'no'}",
         f"iterations            {result.iteration_count}",
     ]
+    if planet_result is not None:
+        lines += [
+            "",
+            "contacts",
+            (
+                "  immersion  t = "
+                f"{planet_result.immersion.hours_after_reference:+.6f} h, "
+                f"UT {_format_hours(planet_result.immersion.universal_time_hour)}, "
+                f"P = {planet_result.immersion.position_angle_deg:.2f} deg, "
+                f"h = {planet_result.immersion.altitude_deg:+.2f} deg, "
+                f"visible = {'yes' if planet_result.immersion.is_visible else 'no'}"
+            ),
+            (
+                "  emersion   t = "
+                f"{planet_result.emersion.hours_after_reference:+.6f} h, "
+                f"UT {_format_hours(planet_result.emersion.universal_time_hour)}, "
+                f"P = {planet_result.emersion.position_angle_deg:.2f} deg, "
+                f"h = {planet_result.emersion.altitude_deg:+.2f} deg, "
+                f"visible = {'yes' if planet_result.emersion.is_visible else 'no'}"
+            ),
+        ]
     if comparison is not None:
         lines += [
             "",

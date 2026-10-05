@@ -17,6 +17,7 @@ from occultation.cli import (
 
 REPOSITORY_ROOT = Path(__file__).parents[1]
 ELEMENTS_FIXTURE = REPOSITORY_ROOT / "tests" / "fixtures" / "meeus_regulus_1999.json"
+MARS_FIXTURE = REPOSITORY_ROOT / "tests" / "fixtures" / "meeus_mars_1997.json"
 HONG_KONG_LOCATION = REPOSITORY_ROOT / "config" / "locations" / "hong_kong.toml"
 
 
@@ -429,3 +430,90 @@ def test_verify_without_an_example_is_a_usage_error(
     captured = capsys.readouterr()
     assert exit_code == EXIT_USAGE
     assert "meeus-example-5" in captured.err
+
+
+def test_local_circumstances_planet_body_reports_contacts(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``--body planet`` adds the immersion and emersion contacts to the output."""
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--elements",
+            str(MARS_FIXTURE),
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "72",
+            "--body",
+            "planet",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_OK
+    assert "lunar occultation of a planet" in captured.out
+    assert "visible?" in captured.out
+    assert "contacts" in captured.out
+    assert "immersion" in captured.out
+    assert "emersion" in captured.out
+    assert captured.err == ""
+
+
+def test_local_circumstances_planet_json_carries_visibility_and_contacts(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The planet payload exposes ``is_visible`` and per-contact visibility."""
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--elements",
+            str(MARS_FIXTURE),
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "72",
+            "--body",
+            "planet",
+            "--format",
+            "json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_OK
+    document = json.loads(captured.out)
+    assert document["inputs"]["elements"]["declination_rate_deg_per_hour"] == (
+        pytest.approx(-0.00057)
+    )
+    assert document["inputs"]["elements"]["aberration_term"] == pytest.approx(21.25)
+    assert isinstance(document["result"]["is_visible"], bool)
+    assert document["contacts"]["immersion"]["name"] == "immersion"
+    assert document["contacts"]["emersion"]["name"] == "emersion"
+    assert isinstance(document["contacts"]["immersion"]["is_visible"], bool)
+    assert isinstance(document["contacts"]["emersion"]["is_visible"], bool)
+
+
+def test_local_circumstances_star_body_omits_contacts(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A star has no contacts, so the planet block must stay absent."""
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--elements",
+            str(ELEMENTS_FIXTURE),
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "65",
+            "--format",
+            "json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_OK
+    document = json.loads(captured.out)
+    assert "contacts" not in document
+    assert document["result"]["is_visible"] is False

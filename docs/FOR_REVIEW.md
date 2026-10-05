@@ -1,8 +1,41 @@
 # For review — a runnable occultation CLI, and proof that it matches the book
 
 **Audience:** anyone who wants to check the work without reading Python.
-**Branch:** `feat/cli-local-circumstances`, merged into `develop`.
-**Date:** 2026-09-23.
+**Branch:** `feat/cli-local-circumstances`, merged into `develop`; the planet
+branch (below) is on the working tree, uncommitted.
+**Date:** 2026-09-23 (star CLI); planet branch added 2026-10-06.
+
+---
+
+## 0. The planet branch (added 2026-10-06)
+
+The command line now takes `--body star|planet`. A **star** is a point at
+infinity: its declination is constant (`D1 = 0`) and the Moon's shadow is a
+cylinder of radius `k`. A **planet** is at a finite distance, so its declination
+drifts (`d = D0 + D1 t`) and the Moon's shadow is a cone of radius
+`L = k − ζF/1e6`; the planet branch also reports the two **contacts** — the
+moment its disk first touches the Moon's limb (immersion) and the moment it
+leaves (emersion). Setting `D1 = F = 0` reduces the code exactly to the star
+path, which is why the Regulus regression still passes unchanged.
+
+Both the closest approach and each contact now carry an **`is_visible`** flag:
+`is_occultation and altitude_deg > 0` (geometric horizon; refraction is
+deliberately deferred). The proof is Meeus Example 3 — occultation of Mars,
+1997 November 12, Uccle — where the immersion happens at `h = +66°` (visible)
+and the emersion at `h = −15°` (below the horizon), so the two contacts differ
+in visibility. That per-contact difference is what pins the definition.
+
+```bash
+uv run occultation local-circumstances \
+  --elements tests/fixtures/meeus_mars_1997.json \
+  --location config/locations/hong_kong.toml \
+  --delta-t-seconds 72 --body planet
+uv run pytest tests/reference_cases/test_meeus_mars.py -q
+```
+
+The formulas and their printed-page provenance are in
+`docs/algorithms/meeus-planet-local-circumstances.md`. The star sections below
+are unchanged and still accurate.
 
 ---
 
@@ -296,7 +329,9 @@ elements are the book's Palomar example, reused for a site 11 000 km away.
 | `src/occultation/reference/__init__.py` | new | Declares the reference-engine package and its one-way dependency rule. |
 | `src/occultation/reference/skyfield_engine.py` | new | The reference engine's placeholder. It raises instead of returning a number. |
 | `tests/fixtures/meeus_regulus_1999.json` | new | A JSON twin of the existing TOML fixture, carrying the book's printed values and the tolerances they justify. |
-| `tests/test_cli.py` | extended | 4 tests before, 17 now: exit codes, both input styles, JSON shape, the mismatch path. |
+| `tests/fixtures/meeus_mars_1997.{toml,json}` | new (2026-10-06) | The planet-branch fixture: Meeus Example 3 (Mars, 1997 November 12, Uccle), with `D1`, `F`, and the immersion/emersion contacts. |
+| `tests/reference_cases/test_meeus_mars.py` | new (2026-10-06) | The planet regression: closest approach, both contacts, and per-contact `is_visible`. |
+| `tests/test_cli.py` | extended | 4 tests before, 17 at the CLI change, 20 now: adds the `--body planet` text and JSON paths and the star-omits-contacts path. |
 | `tests/unit/test_elements_file.py` | new | 8 tests for the elements loader. |
 | `tests/unit/test_location_file.py` | new | 7 tests for the site loader. |
 | `tests/unit/test_reference_engine.py` | new | 3 tests that the reference engine refuses to answer. |
@@ -320,6 +355,9 @@ change only makes it reachable.
 --shadow-x0 --shadow-x1 --shadow-x2       the Moon's X polynomial
 --shadow-y0 --shadow-y1 --shadow-y2       the Moon's Y polynomial
 --shadow-radius-earth-radii               the Moon's radius k (default 0.272495)
+--declination-rate-deg-per-hour D1         the body's declination rate (0 for a star)
+--aberration-term F                         the Table III aberration term (0 for a star)
+--body star|planet                          star (default) or planet; planet adds contacts
 
 --location FILE            observer site (.json or .toml)
   or the inline equivalents:
@@ -468,9 +506,12 @@ $ uv run occultation local-circumstances ... --engine compare
                                                      -> exit 0, comparison: unavailable
 $ uv run occultation local-circumstances ... --engine skyfield
                                                      -> exit 3, no result printed
-$ uv run pytest -q                                   -> 41 passed
+$ uv run occultation local-circumstances --elements ...meeus_mars_1997.json \
+    --location ... --delta-t-seconds 72 --body planet
+                                                     -> exit 0, planet + contacts
+$ uv run pytest -q                                   -> 45 passed
 $ uv run ruff check .                                -> All checks passed!
-$ uv run ruff format --check .                       -> 26 files already formatted
+$ uv run ruff format --check .                       -> 27 files already formatted
 $ uv run mypy src                                    -> Success: no issues found in 13 source files
 $ uv run pytest --cov=occultation --cov-report=term-missing
                                                      -> TOTAL 90%
@@ -495,6 +536,11 @@ itself a test, so a transcription slip in either file fails the suite.
 - **The numbers are not observation-grade.** They reproduce a textbook example
   to the precision the textbook prints. Nothing here has been compared with
   real observations or with the Hong Kong Observatory's published almanac.
+- **No Hong Kong visibility sweep over the planets yet.** The planet branch and
+  `is_visible` are proved against Meeus Example 3 (Uccle), but there is no
+  fixture per planet for a Hong Kong observer. That needs one hand-transcribed
+  Table III row per event, cross-checked against NAOJ, and is the next
+  increment (Jupiter first).
 - **The packaged wheel does not contain the fixture.** `uv build` produces a
   wheel containing only the `occultation` package (checked with `unzip -l`), so
   `occultation verify meeus-example-5` works from a source checkout, where the
@@ -538,5 +584,6 @@ itself a test, so a transcription slip in either file fails the suite.
 | The textbook chapter, drawn scenario by scenario | `docs/meeus-pictures.html` |
 | The code base, file by file | `docs/CODEBASE.md` |
 | The formulas and their printed-page provenance | `docs/algorithms/meeus-star-local-circumstances.md` |
+| The planet branch: `D1`, `ζ`, `F`, the cone-shaped shadow, and the contacts | `docs/algorithms/meeus-planet-local-circumstances.md` |
 | The tools used here (Python, uv, pytest, Git, CI), from zero | `docs/tooling.html` |
 | Constraints, defect history, roadmap | `docs/AGENT_HANDOFF.md` |

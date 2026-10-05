@@ -183,9 +183,12 @@ Sign conventions that are easy to get wrong:
   `longitude_deg_east`, so the `- lambda` term becomes `+ longitude_deg_east`.
 - The event is not visible when `h` is negative.
 
-Not implemented yet (later milestone): the exact immersion and emersion times,
+Not implemented in the star case: the exact immersion and emersion times,
 which start from `t -/+ sqrt(1 - Delta^2) / n` (printed p. 226) and re-run the
-iteration from that guess, separately for each contact.
+iteration from that guess, separately for each contact. Those contacts belong
+to the planet branch, because a star is a point and its only noteworthy instant
+is the closest approach; see
+[`meeus-planet-local-circumstances.md`](meeus-planet-local-circumstances.md) §5.
 
 ## 8. Example 5 as the regression target (printed pp. 228-229)
 

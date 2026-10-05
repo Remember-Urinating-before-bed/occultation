@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "source": "Jean Meeus, Astronomical Tables, Occultations",
+    "example": "Example 3 - Occultation of Mars, 1997 November 12",
+    "printed_pages": "224-226",
+    "pdf_pages": "6-8",
+    "note": "JSON twin of meeus_mars_1997.toml. Every value was read off the scan by eye; OCR text is never a source of truth. Meeus prints the longitude west-positive (2.3372 degrees west); the project convention is east-positive, hence the sign flip on longitude_deg_east. This is the worked example that exercises the planet branch: D1 = -0.00057 deg/h and the aberration term F = 21.25 make the Moon's shadow a cone of radius L = k - zeta F / 1e6 rather than the star's cylinder.",
+    "tolerances": {
+      "rho_sin_geocentric_latitude": 5e-07,
+      "rho_cos_geocentric_latitude": 5e-07,
+      "hours_after_reference": 5e-06,
+      "separation_in_moon_radii": 0.0005,
+      "position_angle_deg": 0.02,
+      "altitude_deg": 0.5
+    }
+  },
+  "observer": {
+    "longitude_deg_east": -2.3372,
+    "latitude_deg": 48.8364,
+    "elevation_m": 67.0
+  },
+  "event": {
+    "reference_hour_td": 4.0,
+    "delta_t_seconds": 72.0
+  },
+  "elements": {
+    "star_declination_deg": 24.99235,
+    "greenwich_hour_angle_at_reference_deg": 62.22691,
+    "greenwich_hour_angle_rate_deg_per_hour": 15.06158,
+    "declination_rate_deg_per_hour": -0.00057,
+    "aberration_term": 21.25,
+    "moon_shadow_radius_earth_radii": 0.273828,
+    "moon_shadow_x": {
+      "at_reference": -0.248914,
+      "linear_rate_per_hour": 0.568162,
+      "quadratic_term_per_hour_squared": -1e-06
+    },
+    "moon_shadow_y": {
+      "at_reference": 0.55345,
+      "linear_rate_per_hour": 0.101246,
+      "quadratic_term_per_hour_squared": 6.2e-05
+    }
+  },
+  "expected": {
+    "rho_sin_geocentric_latitude": 0.749224,
+    "rho_cos_geocentric_latitude": 0.65947,
+    "hours_after_reference": 1.58513,
+    "separation_in_moon_radii": -0.24405,
+    "position_angle_deg": 177.01,
+    "altitude_deg": 22.7,
+    "is_occultation": true,
+    "is_visible": true,
+    "immersion": {
+      "hours_after_reference": -3.86849,
+      "position_angle_deg": 84.48,
+      "altitude_deg": 66.14,
+      "is_visible": true
+    },
+    "emersion": {
+      "hours_after_reference": 8.81897,
+      "position_angle_deg": 264.18,
+      "altitude_deg": -15.35,
+      "is_visible": false
+    }
+  }
+}

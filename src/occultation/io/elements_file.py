@@ -12,6 +12,8 @@ name, exactly as the domain model does. The schema is::
         "greenwich_hour_angle_at_reference_deg": 156.6836,
         "greenwich_hour_angle_rate_deg_per_hour": 15.04107,
         "moon_shadow_radius_earth_radii": 0.272495,
+        "declination_rate_deg_per_hour": 0.0,
+        "aberration_term": 0.0,
         "moon_shadow_x": { "at_reference": ..., "linear_rate_per_hour": ...,
                            "quadratic_term_per_hour_squared": ... },
         "moon_shadow_y": { ... }
@@ -96,6 +98,10 @@ def star_elements_from_mapping(data: dict[str, Any]) -> StarOccultationElements:
         moon_shadow_radius_earth_radii=_number(
             elements, "moon_shadow_radius_earth_radii", default=0.272495
         ),
+        declination_rate_deg_per_hour=_number(
+            elements, "declination_rate_deg_per_hour", default=0.0
+        ),
+        aberration_term=_number(elements, "aberration_term", default=0.0),
     )
 
 

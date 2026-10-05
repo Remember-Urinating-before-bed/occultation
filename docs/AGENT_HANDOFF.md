@@ -1140,6 +1140,22 @@ Progress through:
 7. grazing occultation;
 8. regional visibility.
 
+**Progress 2026-10-06.** The star case (steps 1-2, plus step 5's position
+angle) is done and pinned to Meeus Example 5. The **planet branch** is now in
+place too: the declination rate `D1`, the aberration term `F` that turns the
+Moon's shadow into a cone of radius `L = k - zeta F / 1e6`, the `zeta D1` term
+in `eta'`, and the immersion/emersion contacts (step 4) are implemented and
+pinned to Meeus Example 3 (Mars, 1997 November 12, Uccle) in
+`tests/reference_cases/test_meeus_mars.py`. An `is_visible` flag
+(`is_occultation and altitude_deg > 0`, geometric horizon) is exposed for the
+closest approach and for each contact. The formulas and their printed-page
+provenance are in `docs/algorithms/meeus-planet-local-circumstances.md`.
+
+Still open on this milestone: a Hong Kong visibility sweep over the eight
+planets (Jupiter first), which needs one hand-transcribed Table III row per
+event cross-checked against NAOJ; step 3 (proper-motion-aware star), step 6
+(lunar limb correction), and steps 7-8 (grazing, regional visibility).
+
 Prove by comparing with Occult and explaining the remaining differences.
 
 ### Milestone 15 — Optional later work
@@ -1454,6 +1470,18 @@ The roadmap in §9 is the long-term plan. The next increments, in order:
 > entry point is fixed and covered by `tests/test_cli.py`, the seven Meeus files are re-typed and
 > passing, and the transcription exists as `docs/algorithms/meeus-star-local-circumstances.md`.
 > Resume at item 3.
+>
+> **Status 2026-10-06: the planet branch is DONE.** `local-circumstances` now takes
+> `--body star|planet`; the planet branch adds the declination rate `D1`, the aberration term `F`
+> (cone-shaped shadow `L = k - zeta F / 1e6`), the `zeta D1` term in `eta'`, and the immersion and
+> emersion contacts, and it exposes `is_visible` for the closest approach and each contact. It is
+> pinned to Meeus Example 3 (Mars, 1997 November 12, Uccle) in
+> `tests/reference_cases/test_meeus_mars.py` + `tests/fixtures/meeus_mars_1997.{toml,json}`, and the
+> formulas are documented in `docs/algorithms/meeus-planet-local-circumstances.md`. The star
+> regression (Regulus) still passes unchanged, which is the proof that `D1 = F = 0` reduces exactly
+> to the star path. The next increment is a Hong Kong visibility sweep over the eight planets
+> (Jupiter first), which needs one hand-transcribed Table III row per event cross-checked against
+> NAOJ. Items 3-6 below still stand.
 
 1. **Make the quality gate green** (milestone 0, §7.2): fix D1 (entry point), D2 (`hk_almanac` →
    `occultation` imports), D3/D5 (re-type the broken modules and tests), D4 (valid TOML fixture),
