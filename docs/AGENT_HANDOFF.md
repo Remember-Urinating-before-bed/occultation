@@ -1153,7 +1153,9 @@ provenance are in `docs/algorithms/meeus-planet-local-circumstances.md`.
 
 Still open on this milestone: a Hong Kong visibility sweep over the eight
 planets (Jupiter first), which needs one hand-transcribed Table III row per
-event cross-checked against NAOJ; step 3 (proper-motion-aware star), step 6
+event cross-checked **by hand** against NAOJ (the NAOJ service is an interactive
+form returning a rendered figure, not a data table, so it cannot be scripted —
+see `docs/FOR_REVIEW.md` §13.10); step 3 (proper-motion-aware star), step 6
 (lunar limb correction), and steps 7-8 (grazing, regional visibility).
 
 Prove by comparing with Occult and explaining the remaining differences.

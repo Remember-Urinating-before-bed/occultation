@@ -541,8 +541,9 @@ itself a test, so a transcription slip in either file fails the suite.
 - **No Hong Kong visibility sweep over the planets yet.** The planet branch and
   `is_visible` are proved against Meeus Example 3 (Uccle), but there is no
   fixture per planet for a Hong Kong observer. That needs one hand-transcribed
-  Table III row per event, cross-checked against NAOJ, and is the next
-  increment (Jupiter first).
+  Table III row per event, cross-checked **by hand** against NAOJ, and is the
+  next increment (Jupiter first). See §13.10 for why the NAOJ check is a manual
+  step and not a script.
 - **The packaged wheel does not contain the fixture.** `uv build` produces a
   wheel containing only the `occultation` package (checked with `unzip -l`), so
   `occultation verify meeus-example-5` works from a source checkout, where the
@@ -585,6 +586,13 @@ pushed. It is deliberately adversarial: the point is to name the places where
 this code could mislead a future reader or fail silently, not to congratulate
 the parts that work. Findings are ordered by how much damage they could do, and
 each one says what to do about it.
+
+> **Update 2026-10-06 (later the same day).** A question about the NAOJ
+> prediction service (https://eco.mtk.nao.ac.jp/cgi-bin/koyomi/cande/c_occulx_p_en.cgi)
+> prompted a check of how the "cross-checked against NAOJ" plan in §11 actually
+> works. It does not, yet — see **§13.10**. The NAOJ service is a validated
+> *reference*, never a runtime dependency (§3.3), so this changes the plan, not
+> the code.
 
 ### 13.1 `is_planet` is a heuristic, not a fact (highest priority)
 
@@ -668,6 +676,78 @@ No blockers. 13.1 is the one item worth resolving before `is_planet` is relied
 on anywhere beyond display; the rest are hardening. The commit is safe to review
 as-is, and the next increment (the Hong Kong Jupiter sweep) should carry the
 provenance discipline of §13.8 forward.
+
+### 13.10 The "cross-checked against NAOJ" plan does not work as written
+
+§11 and `docs/algorithms/meeus-planet-local-circumstances.md` §9 both say the
+Hong Kong sweep needs "one hand-transcribed Table III row per event,
+cross-checked against NAOJ". The first half is fine. The second half cannot be
+done the way it reads, and this section records why, with evidence gathered
+2026-10-06.
+
+**What the NAOJ service actually is.** `c_occulx_p_en.cgi` is an interactive
+form (POST, `application/x-www-form-urlencoded`), not a data endpoint. Its
+fields are `NAO_id` (place id), `choice` (`0` major cities, `1` specify
+lat/lon/hgt, `2` favourites, `4` Google Maps), `lat`/`lon` as **DMS strings**
+(`"22 18"`, not decimal degrees), `hgt` in metres, `lst` (local standard time
+offset), `body` (`99` all planets, `88` visible-only, `1`–`8` per planet),
+`year` (2009–2027 only), plus buttons `btn00` (list events), `btn01` (local
+prediction), `btn02` (map), `btn07`/`btn08` (sun, starry view). A `Set` button
+per listed event (`pocl<YYYYMM>`) selects it before `btn01` is pressed.
+
+**Why a scripted fetch is fragile.** Three independent reasons:
+
+1. **The form is JavaScript-driven.** The place selector calls `set_lst()`,
+   which sets the time zone from the place id; `choice` is committed by
+   `set_nocalc()`, which submits the form immediately. A raw POST that skips
+   these leaves the server on its defaults — in my tests a POST carrying
+   `choice=1&lat=22 18 07&lon=114 10 28` was echoed back as the Tokyo default
+   `Lat.:35.6581 Lon.:139.7414`, i.e. the custom coordinates were silently
+   ignored. Getting a custom site to stick requires replaying the same sequence
+   the browser performs, which is exactly the kind of brittle scraping the
+   handoff's provenance rule exists to avoid.
+2. **The output is a rendered figure, not a table.** The local prediction comes
+   back as `mov<YYYYMM>.gif` plus a caption ("Not Visible", or the contact
+   figure). There is no machine-readable contact list to diff against, so an
+   automated comparison would mean OCR — which the repository forbids as
+   anything other than a search index.
+3. **The service is not a stable API.** The page footer says "We might modify
+   this program without notice (ver.2.0h)". A test that depends on the current
+   HTML would be a maintenance liability, not a regression guard.
+
+**What the plan should say instead.** Keep NAOJ as a *human* cross-check, and
+make the automated oracle something that is actually a data source. In order of
+preference:
+
+1. **A second independent algorithm over the same elements.** The strongest
+   check available today is to recompute the same event from the same
+   hand-transcribed Besselian elements by an independent route (for example the
+   direct topocentric angular-separation method, or a small step-by-step
+   propagation) and require the two to agree. That tests the implementation, not
+   the source, which is where transcription errors actually show up.
+2. **A published almanac, transcribed by hand.** The Hong Kong Observatory
+   almanac (already a validated reference in the handoff) or the NAOJ yearly
+   *list* of events — the dates, not the per-site contacts — can be hand-typed
+   into a fixture with printed-page provenance, exactly as the Meeus rows are.
+   This is a slow, deliberate, human step; it is not a script.
+3. **Occult v4 by David Herald**, already named in the handoff as the later
+   comparison target, once the project is far enough along to justify it.
+
+**Consequence for the next increment.** The Jupiter sweep should therefore
+proceed as: hand-transcribe the Table III row (with printed-page and PDF-page
+provenance), build the fixture, and *then* cross-check the resulting contact
+times against NAOJ **by hand** — opening the form in a browser for Hong Kong
+(lat `22 18`, lon `114 10`, `lst` 8, `body` 5, year 2026) and reading the
+rendered figure. The NAOJ dates for 2026 Jupiter are 2026-09-09, 2026-10-06,
+2026-11-03 and 2026-11-30; the 2026-10-06 event reports "Not Visible" for
+Tokyo, which is a useful negative check to reproduce for Hong Kong.
+
+**Recommendation:** fix the wording in §11 and in the algorithm doc so it says
+"cross-checked by hand against NAOJ", and record the NAOJ form's field
+conventions (DMS lat/lon, west-positive longitude is *not* used here — NAOJ
+takes east-positive decimal on the map but DMS degrees-minutes in the form) so
+the next person does not rediscover this. No code change is required; this is a
+documentation and process correction.
 
 ## 14. Where to read more
 

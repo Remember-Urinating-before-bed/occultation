@@ -325,7 +325,9 @@ this set:
 - A Hong Kong visibility sweep over the eight planets. The planet branch and the
   `is_visible` flag exist and are tested against Meeus Example 3, but a fixture
   per planet (Jupiter first) that a Hong Kong observer could actually see is
-  still to be transcribed and cross-checked against NAOJ.
+  still to be transcribed and cross-checked **by hand** against NAOJ. The NAOJ
+  service is an interactive form that returns a rendered figure, not a data
+  table, so this check cannot be scripted; see `docs/FOR_REVIEW.md` §13.10.
 - Lunar limb profile, grazing occultations, regional visibility.
 - Everything else in the almanac: Sun/Moon positions and events, twilight,
   phases, the 24 solar terms, planets, the batch pipeline, storage, and an API.

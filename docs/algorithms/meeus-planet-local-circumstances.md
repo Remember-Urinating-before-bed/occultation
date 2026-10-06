@@ -202,7 +202,10 @@ belong to a site 11 000 km away.
 
 The planet branch and `is_visible` are proved against Meeus Example 3. A Hong
 Kong visibility sweep over the eight planets (Jupiter first) still needs a
-hand-transcribed Table III row per event, cross-checked against NAOJ; that is
-the next increment, and it is recorded as not-done in `docs/CODEBASE.md` §8.
+hand-transcribed Table III row per event, cross-checked **by hand** against
+NAOJ; that is the next increment, and it is recorded as not-done in
+`docs/CODEBASE.md` §8. The NAOJ service is an interactive form whose output is a
+rendered figure, not a data table, so the check cannot be scripted — see
+`docs/FOR_REVIEW.md` §13.10.
 
 `F == 0.0`, so the star path is bit-for-bit unchanged.
