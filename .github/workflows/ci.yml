@@ -1,11 +1,15 @@
 name: CI
 
-on: 
+on:
   push:
     branches:
       - main
       - develop
-    pull_request:
+  pull_request:
+  # Manual trigger: lets a maintainer run the full pipeline from the Actions tab
+  # (Actions -> CI -> Run workflow) on any branch, without waiting for a push or
+  # a pull_request event. Useful while the default-branch / PR wiring is sorted.
+  workflow_dispatch:
 
 permissions:
   contents: read
