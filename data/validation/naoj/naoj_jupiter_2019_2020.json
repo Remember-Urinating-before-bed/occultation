@@ -1,0 +1,41 @@
+{
+    "$schema_version": 1,
+    "kind": "reference-validation",
+    "name": "naoj-jupiter-occultations-2019-2020",
+    "source": "https://eco.mtk.nao.ac.jp/cgi-bin/koyomi/occult/index.html",
+    "source_description": "NAOJ lunar-occultation prediction form (ephemeris: NAOJ's own). Saved result page for the four Jupiter events of Meeus Table III.",
+    "site": {
+        "name": "Uccle",
+        "longitude_deg_east": -2.3372,
+        "latitude_deg": 48.8364,
+        "elevation_m": 67
+    },
+    "retrieved": "2026-06-10",
+    "transcription_note": "Human-saved NAOJ result pages, transcribed by eye into this small document. NAOJ draws the contact times as a .gif image; OCR of that image is forbidden by the project handoff, so only the machine-readable status text is captured. 'status' is NAOJ's own wording for the event; 'is_visible' is the boolean this project reads from it.",
+    "events": [
+        {
+            "date": "2019-11-28",
+            "body": "Jupiter",
+            "status": "Visible",
+            "is_visible": true
+        },
+        {
+            "date": "2019-12-26",
+            "body": "Jupiter",
+            "status": "Not Visible",
+            "is_visible": false
+        },
+        {
+            "date": "2020-01-23",
+            "body": "Jupiter",
+            "status": "Not Visible",
+            "is_visible": false
+        },
+        {
+            "date": "2020-02-19",
+            "body": "Jupiter",
+            "status": "Not Visible",
+            "is_visible": false
+        }
+    ]
+}

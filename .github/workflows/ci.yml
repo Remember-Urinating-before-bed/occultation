@@ -45,3 +45,32 @@ jobs:
 
       - name: Run tests
         run: uv run pytest --cov=occultation --cov-report=term-missing
+
+  data:
+    name: Data Integrity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.12.7"
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install project
+        run: uv sync --locked --dev
+
+      # External data is never fetched at runtime. This job only checks that the
+      # committed snapshot still matches its recorded checksum and that the saved
+      # NAOJ reference agrees with this project's solver.
+      - name: Verify recorded checksums
+        run: uv run python scripts/fetch_reference_data.py verify
+
+      - name: Check the saved NAOJ snapshot against the solver
+        run: uv run python scripts/verify_reference_data.py

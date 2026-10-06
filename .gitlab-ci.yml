@@ -1,5 +1,6 @@
 stages:
   - quality
+  - data
 
 variables:
   # Keep the uv cache inside the project directory so the GitLab cache can find it.
@@ -60,3 +61,23 @@ quality:
     - uv run ruff format --check .
     - uv run mypy src
     - uv run pytest --cov=occultation --cov-report=term-missing
+
+# External data is never fetched at runtime. This job only checks that the
+# committed snapshot still matches its recorded checksum and that the saved NAOJ
+# reference agrees with this project's solver. It mirrors the GitHub `data` job.
+data:
+  stage: data
+  image: ghcr.io/astral-sh/uv:0.12.7-python3.12-bookworm-slim
+  interruptible: true
+  cache:
+    key:
+      files:
+        - uv.lock
+    paths:
+      - .uv-cache/
+  before_script:
+    - uv --version
+  script:
+    - uv sync --locked --dev
+    - uv run python scripts/fetch_reference_data.py verify
+    - uv run python scripts/verify_reference_data.py

@@ -325,8 +325,37 @@ def _add_verify_parser(
     )
 
 
+def _validate_body_against_elements(
+    body: str, elements: StarOccultationElements
+) -> None:
+    """Refuse a ``--body`` flag that contradicts the numeric elements.
+
+    ``--body`` only decides whether contacts are computed and how the output is
+    labelled; the physics is driven entirely by ``D1`` and ``F``. So
+    ``--body star`` with non-zero ``D1``/``F`` would run planet physics while
+    printing "star", and ``--body planet`` with ``D1 = F = 0`` would run the
+    star physics under a planet label (FOR_REVIEW 13.3). Rather than let the
+    flag and the numbers disagree, this rejects the mismatch as a usage error,
+    consistent with how the CLI already refuses to mix ``--elements`` with the
+    inline element options.
+    """
+    if body == "planet" and not elements.is_planet:
+        raise ValueError(
+            "--body planet requires a planet element set, but both "
+            "declination_rate_deg_per_hour (D1) and aberration_term (F) are "
+            "zero; pass --body star, or supply the planet terms"
+        )
+    if body == "star" and elements.is_planet:
+        raise ValueError(
+            "--body star conflicts with the elements: declination_rate_deg_per_hour "
+            "(D1) or aberration_term (F) is non-zero, which is planet physics; "
+            "pass --body planet"
+        )
+
+
 def _run_local_circumstances(arguments: argparse.Namespace) -> int:
     elements = _resolve_elements(arguments)
+    _validate_body_against_elements(arguments.body, elements)
     observer = _resolve_observer(arguments)
     if arguments.engine == "skyfield":
         # Fail loudly rather than print a custom-core answer under a reference
@@ -347,6 +376,10 @@ def _run_local_circumstances(arguments: argparse.Namespace) -> int:
     )
     # A planet also has immersion and emersion contacts; a star has only the
     # closest approach, so its contacts stay None and are never printed.
+    # A non-occulting planet has no contacts to compute, so the block is skipped
+    # and the user is told why rather than left with a silent star-shaped answer
+    # (FOR_REVIEW 13.4).
+    planet_requested = arguments.body == "planet"
     planet_result = (
         calculate_planet_local_circumstances(
             elements=elements,
@@ -355,7 +388,13 @@ def _run_local_circumstances(arguments: argparse.Namespace) -> int:
             convergence_tolerance_hours=arguments.tolerance_hours,
             max_iterations=arguments.max_iterations,
         )
-        if arguments.body == "planet" and result.is_occultation
+        if planet_requested and result.is_occultation
+        else None
+    )
+    note = (
+        "contacts were not computed because the body is not occulted at "
+        "closest approach (|Delta| > 1)"
+        if planet_requested and not result.is_occultation
         else None
     )
     comparison = _comparison_block(
@@ -371,12 +410,15 @@ def _run_local_circumstances(arguments: argparse.Namespace) -> int:
                     result=result,
                     comparison=comparison,
                     planet_result=planet_result,
+                    note=note,
                 ),
                 indent=2,
             )
         )
     else:
         print(_format_result(elements, observer, result, comparison, planet_result))
+        if note is not None:
+            print(f"note: {note}")
     return EXIT_OK
 
 
@@ -574,6 +616,7 @@ def _result_document(
     result: StarOccultationResult,
     comparison: dict[str, Any] | None,
     planet_result: PlanetOccultationResult | None = None,
+    note: str | None = None,
 ) -> dict[str, Any]:
     geocentric = calculate_geocentric_observer(observer)
     document: dict[str, Any] = {
@@ -613,6 +656,8 @@ def _result_document(
             "immersion": _contact_payload(planet_result.immersion),
             "emersion": _contact_payload(planet_result.emersion),
         }
+    if note is not None:
+        document["note"] = note
     if comparison is not None:
         document["comparison"] = comparison
     return document

@@ -1,0 +1,161 @@
+# Twin of meeus_jupiter_2019_2020.json. A transcription slip in either file must
+# fail tests/unit/test_elements_file.py::test_the_jupiter_fixture_twins_agree.
+#
+# Source: Jean Meeus, Astronomical Tables, Occultations, Table III, printed
+# pp. 224-226 (PDF pp. 6-8). The elements were transcribed by eye from the scan;
+# OCR text is never a source of truth. The observer is Uccle (the site of Meeus
+# Example 3) and Delta T = 69 s.
+#
+# The 'expected' blocks are DERIVED from this repository's own solver, not read
+# from the book: these rows carry no printed results, so they are a regression
+# lock on current behaviour, not an independent oracle. Event 1 (2019-11-28) is a
+# genuine occultation at Uccle; events 2-4 miss the Moon.
+
+[metadata]
+source = "Jean Meeus, Astronomical Tables, Occultations"
+example = "Table III - Occultations of Jupiter, 2019 November 28 to 2020 February 19"
+printed_pages = "224-226"
+pdf_pages = "6-8"
+note = "Four consecutive Jupiter events transcribed from Table III of the Occultations chapter. The elements (T0, D0, D1, H0, H1, X0/X1/X2, Y0/Y1/Y2, k, F) were read off the scan by eye; OCR text is never a source of truth. The observer is Uccle (the site of Meeus Example 3) and Delta T = 69 s. Unlike Examples 3 and 5 these rows carry NO printed results, so the 'expected' block is DERIVED from this repository's own solver, not read from the book: it is a regression lock on current behaviour, not an independent oracle. Event 1 (2019-11-28) is a genuine occultation at Uccle; events 2-4 miss the Moon, so they report is_occultation = false and have no contacts."
+
+[metadata.tolerances]
+hours_after_reference = 1e-06
+separation_in_moon_radii = 1e-06
+position_angle_deg = 0.01
+altitude_deg = 0.01
+
+[observer]
+longitude_deg_east = -2.3372
+latitude_deg = 48.8364
+elevation_m = 67.0
+
+[event]
+delta_t_seconds = 69.0
+
+[events.2019-11-28]
+reference_hour_td = 11.0
+
+[events.2019-11-28.elements]
+star_declination_deg = -23.28992
+declination_rate_deg_per_hour = -0.00012
+greenwich_hour_angle_at_reference_deg = 323.09492
+greenwich_hour_angle_rate_deg_per_hour = 15.03134
+aberration_term = 1.9
+moon_shadow_radius_earth_radii = 0.272608
+
+[events.2019-11-28.elements.moon_shadow_x]
+at_reference = 0.092336
+linear_rate_per_hour = 0.571548
+quadratic_term_per_hour_squared = -0.000024
+
+[events.2019-11-28.elements.moon_shadow_y]
+at_reference = 0.749714
+linear_rate_per_hour = -0.055842
+quadratic_term_per_hour_squared = 0.000003
+
+[events.2019-11-28.expected]
+hours_after_reference = -1.132058
+separation_in_moon_radii = 0.071539
+position_angle_deg = 13.34
+altitude_deg = 2.04
+is_occultation = true
+is_visible = true
+
+[events.2019-11-28.expected.immersion]
+hours_after_reference = -8.150283
+position_angle_deg = 99.94
+altitude_deg = -60.78
+is_visible = false
+
+[events.2019-11-28.expected.emersion]
+hours_after_reference = 5.182201
+position_angle_deg = 279.28
+altitude_deg = 10.16
+is_visible = true
+
+[events.2019-12-26]
+reference_hour_td = 8.0
+
+[events.2019-12-26.elements]
+star_declination_deg = -23.23011
+declination_rate_deg_per_hour = 0.00033
+greenwich_hour_angle_at_reference_deg = 298.69367
+greenwich_hour_angle_rate_deg_per_hour = 15.03087
+aberration_term = 1.87
+moon_shadow_radius_earth_radii = 0.272608
+
+[events.2019-12-26.elements.moon_shadow_x]
+at_reference = 0.273307
+linear_rate_per_hour = 0.568795
+quadratic_term_per_hour_squared = -0.000015
+
+[events.2019-12-26.elements.moon_shadow_y]
+at_reference = 0.17645
+linear_rate_per_hour = -0.03015
+quadratic_term_per_hour_squared = 0.000032
+
+[events.2019-12-26.expected]
+hours_after_reference = -1.7779
+separation_in_moon_radii = 1.695032
+position_angle_deg = 9.79
+altitude_deg = -17.69
+is_occultation = false
+is_visible = false
+
+[events.2020-01-23]
+reference_hour_td = 3.0
+
+[events.2020-01-23.elements]
+star_declination_deg = -22.86588
+declination_rate_deg_per_hour = 0.00075
+greenwich_hour_angle_at_reference_deg = 244.19915
+greenwich_hour_angle_rate_deg_per_hour = 15.03124
+aberration_term = 1.9
+moon_shadow_radius_earth_radii = 0.272611
+
+[events.2020-01-23.elements.moon_shadow_x]
+at_reference = 0.165739
+linear_rate_per_hour = 0.562303
+quadratic_term_per_hour_squared = 0.000007
+
+[events.2020-01-23.elements.moon_shadow_y]
+at_reference = -0.38284
+linear_rate_per_hour = -0.002948
+quadratic_term_per_hour_squared = 0.000056
+
+[events.2020-01-23.expected]
+hours_after_reference = -1.212275
+separation_in_moon_radii = 3.247992
+position_angle_deg = 4.09
+altitude_deg = -47.18
+is_occultation = false
+is_visible = false
+
+[events.2020-02-19]
+reference_hour_td = 20.0
+
+[events.2020-02-19.elements]
+star_declination_deg = -22.26838
+declination_rate_deg_per_hour = 0.001
+greenwich_hour_angle_at_reference_deg = 160.16773
+greenwich_hour_angle_rate_deg_per_hour = 15.03245
+aberration_term = 1.97
+moon_shadow_radius_earth_radii = 0.272617
+
+[events.2020-02-19.elements.moon_shadow_x]
+at_reference = 0.214422
+linear_rate_per_hour = 0.555796
+quadratic_term_per_hour_squared = 0.000012
+
+[events.2020-02-19.elements.moon_shadow_y]
+at_reference = -0.990496
+linear_rate_per_hour = 0.022575
+quadratic_term_per_hour_squared = 0.000078
+
+[events.2020-02-19.expected]
+hours_after_reference = 0.177812
+separation_in_moon_radii = 5.309536
+position_angle_deg = 356.43
+altitude_deg = -59.14
+is_occultation = false
+is_visible = false

@@ -517,3 +517,155 @@ def test_local_circumstances_star_body_omits_contacts(
     document = json.loads(captured.out)
     assert "contacts" not in document
     assert document["result"]["is_visible"] is False
+
+
+def test_local_circumstances_rejects_body_planet_without_planet_terms(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Defect 13.3: ``--body planet`` with ``D1 = F = 0`` is a usage error."""
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--elements",
+            str(ELEMENTS_FIXTURE),
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "65",
+            "--body",
+            "planet",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_USAGE
+    assert captured.out == ""
+    assert "--body planet requires a planet element set" in captured.err
+
+
+def test_local_circumstances_rejects_body_star_with_planet_terms(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Defect 13.3: ``--body star`` with non-zero ``D1``/``F`` is a usage error."""
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--elements",
+            str(MARS_FIXTURE),
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "72",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_USAGE
+    assert captured.out == ""
+    assert "--body star conflicts with the elements" in captured.err
+
+
+def test_local_circumstances_notes_a_non_occulting_planet(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Defect 13.4: a non-occulting planet run explains the missing contacts."""
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--star-declination-deg",
+            "-23.23011",
+            "--reference-hour-td",
+            "8.0",
+            "--greenwich-hour-angle-deg",
+            "298.69367",
+            "--greenwich-hour-angle-rate-deg-per-hour",
+            "15.03087",
+            "--shadow-x0",
+            "0.273307",
+            "--shadow-x1",
+            "0.568795",
+            "--shadow-x2",
+            "-0.000015",
+            "--shadow-y0",
+            "0.17645",
+            "--shadow-y1",
+            "-0.03015",
+            "--shadow-y2",
+            "0.000032",
+            "--shadow-radius-earth-radii",
+            "0.272608",
+            "--declination-rate-deg-per-hour",
+            "0.00033",
+            "--aberration-term",
+            "1.87",
+            "--longitude-deg-east",
+            "-2.3372",
+            "--latitude-deg",
+            "48.8364",
+            "--elevation-m",
+            "67",
+            "--delta-t-seconds",
+            "69",
+            "--body",
+            "planet",
+            "--format",
+            "json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_OK
+    document = json.loads(captured.out)
+    assert document["result"]["is_occultation"] is False
+    assert "contacts" not in document
+    assert "not occulted at closest approach" in document["note"]
+
+
+def test_local_circumstances_non_occulting_planet_note_in_text(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The text path prints the same note on its own line."""
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--star-declination-deg",
+            "-22.26838",
+            "--reference-hour-td",
+            "20.0",
+            "--greenwich-hour-angle-deg",
+            "160.16773",
+            "--greenwich-hour-angle-rate-deg-per-hour",
+            "15.03245",
+            "--shadow-x0",
+            "0.214422",
+            "--shadow-x1",
+            "0.555796",
+            "--shadow-x2",
+            "0.000012",
+            "--shadow-y0",
+            "-0.990496",
+            "--shadow-y1",
+            "0.022575",
+            "--shadow-y2",
+            "0.000078",
+            "--shadow-radius-earth-radii",
+            "0.272617",
+            "--declination-rate-deg-per-hour",
+            "0.001",
+            "--aberration-term",
+            "1.97",
+            "--longitude-deg-east",
+            "-2.3372",
+            "--latitude-deg",
+            "48.8364",
+            "--delta-t-seconds",
+            "69",
+            "--body",
+            "planet",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_OK
+    assert "\ncontacts\n" not in captured.out
+    assert "note: contacts were not computed" in captured.out

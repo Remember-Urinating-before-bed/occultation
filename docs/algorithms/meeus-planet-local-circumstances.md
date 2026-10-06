@@ -198,6 +198,69 @@ The second command reuses the book's Uccle elements for a Hong Kong observer.
 That is a sanity check of the plumbing, not a validated prediction: the elements
 belong to a site 11 000 km away.
 
+## 9. The Jupiter rows of Table III (2019-2020) as a second case
+
+`tests/reference_cases/test_meeus_jupiter.py` plus the twin fixtures
+`tests/fixtures/meeus_jupiter_2019_2020.{toml,json}` add a second planet case,
+four consecutive rows of **Table III** of the Occultations chapter:
+
+```text
+2019 Nov 28   To = 11h   D0 = -23.28992   D1 = -0.00012   F = 1.9    k = 0.272608
+2019 Dec 26   To =  8h   D0 = -23.23011   D1 = +0.00033   F = 1.87   k = 0.272608
+2020 Jan 23   To =  3h   D0 = -22.86588   D1 = +0.00075   F = 1.9    k = 0.272611
+2020 Feb 19   To = 20h   D0 = -22.26838   D1 = +0.00100   F = 1.97   k = 0.272617
+```
+
+The observer is Uccle, the same site as Example 3
+(`longitude_deg_east = -2.3372`, `latitude_deg = 48.8364`, `elevation_m = 67`),
+and `DT = 69 s` (the value for 2019-2020; Example 3's 1997 event used 72 s).
+
+**These rows carry no printed results.** Table III lists the elements only, so
+the `expected` block in the fixture is *derived* from this repository's own
+solver and is a **regression lock on current behaviour, not an independent
+oracle**. The independent check for these rows is the NAOJ saved result page
+under `data/validation/naoj/` (see `data/README.md`), which records whether the
+event was visible from a reference site. Never cite the derived block as if
+Meeus had printed it, and never tighten its tolerances as if a printed digit
+supported them.
+
+At Uccle only the first row is a genuine occultation; the other three miss the
+Moon, so they pin the `is_occultation = false` path and the
+`calculate_planet_local_circumstances` refusal:
+
+```text
+                     Delta     occulted?   contacts
+2019-11-28          +0.0715      yes       immersion / emersion
+2019-12-26          +1.6950      no        none (|Delta| > 1)
+2020-01-23          +3.2480      no        none (|Delta| > 1)
+2020-02-19          +5.3095      no        none (|Delta| > 1)
+```
+
+## 10. Reproduce the Jupiter case
+
+```bash
+uv run pytest tests/reference_cases/test_meeus_jupiter.py -q
+uv run occultation local-circumstances \
+  --star-declination-deg -23.28992 --reference-hour-td 11.0 \
+  --greenwich-hour-angle-deg 323.09492 \
+  --greenwich-hour-angle-rate-deg-per-hour 15.03134 \
+  --shadow-x0 0.092336 --shadow-x1 0.571548 --shadow-x2 -0.000024 \
+  --shadow-y0 0.749714 --shadow-y1 -0.055842 --shadow-y2 0.000003 \
+  --shadow-radius-earth-radii 0.272608 \
+  --declination-rate-deg-per-hour -0.00012 --aberration-term 1.9 \
+  --longitude-deg-east -2.3372 --latitude-deg 48.8364 --elevation-m 67 \
+  --delta-t-seconds 69 --body planet
+```
+
+## 11. CLI guards added with this case (FOR_REVIEW 13.3, 13.4)
+
+- `--body` must agree with the numbers. `--body planet` with `D1 = F = 0`, or
+  `--body star` with a non-zero `D1`/`F`, is now a usage error (exit 2) rather
+  than a mislabelled run. The check lives in
+  `occultation.cli._validate_body_against_elements`.
+- A non-occulting `--body planet` run is no longer silent: the JSON gains a
+  `note` field and the text output a `note:` line saying contacts were not
+  computed because the body is not occulted at closest approach.
 ## 9. Still to come
 
 The planet branch and `is_visible` are proved against Meeus Example 3. A Hong

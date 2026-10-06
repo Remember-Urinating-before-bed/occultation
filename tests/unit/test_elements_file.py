@@ -95,6 +95,22 @@ def test_a_non_numeric_value_is_rejected() -> None:
     assert "must be a number" in str(error.value)
 
 
+def test_the_jupiter_fixture_twins_agree() -> None:
+    """The Jupiter twins are hand-maintained; a slip in either one must fail."""
+    import tomllib
+
+    json_path = FIXTURE_PATH.parent / "meeus_jupiter_2019_2020.json"
+    toml_path = FIXTURE_PATH.parent / "meeus_jupiter_2019_2020.toml"
+    json_document = json.loads(json_path.read_text(encoding="utf-8"))
+    with toml_path.open("rb") as toml_file:
+        toml_document = tomllib.load(toml_file)
+
+    assert json_document["metadata"] == toml_document["metadata"]
+    assert json_document["observer"] == toml_document["observer"]
+    assert json_document["event"] == toml_document["event"]
+    assert json_document["events"] == toml_document["events"]
+
+
 def test_an_elements_mapping_is_accepted_on_its_own() -> None:
     """The inline command-line path passes an ``elements`` object directly."""
     document = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
