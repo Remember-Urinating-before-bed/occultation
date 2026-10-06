@@ -85,6 +85,9 @@ def test_regulus_local_circumstances_match_meeus() -> None:
         abs=0.5,
     )
     assert result.is_occultation is expected["is_occultation"]
+    # The star misses the Moon, so it is not visible even though it is high in
+    # the sky. This pins the occulted-AND-above-horizon definition.
+    assert result.is_visible is expected["is_visible"]
     # Not a book value: the number of tau iterations the solver performs when
     # it starts from Meeus's first approximation t = 0 (printed p. 224) and
     # stops once |tau| < 1e-6 h. Re-derive it whenever the starting guess or

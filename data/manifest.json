@@ -1,4 +1,17 @@
 {
     "$schema_version": 1,
-    "datasets": [] 
+    "datasets": [
+        {
+            "name": "naoj-jupiter-occultations-2019-2020",
+            "path": "data/validation/naoj/naoj_jupiter_2019_2020.json",
+            "kind": "reference-validation",
+            "source": "https://eco.mtk.nao.ac.jp/cgi-bin/koyomi/occult/index.html",
+            "source_description": "NAOJ (National Astronomical Observatory of Japan) lunar-occultation prediction form; the four Jupiter events of Meeus Table III, 2019 November 28 to 2020 February 19, for a reference site.",
+            "version": "saved-page snapshot",
+            "coverage": "2019-11-28/2020-02-19",
+            "retrieved": "2026-06-10",
+            "sha256": "b44de9fff8fb502ae37b4c2678feca3f11e04889b8104913e7e60c701ab29f29",
+            "notes": "Human-saved result pages, transcribed into a small JSON document. NAOJ renders contact times as a .gif image, so only the machine-readable status text ('Not Visible' / a visible status) is captured; OCR of the image is forbidden. The document is the independent oracle for the Jupiter regression lock in tests/reference_cases/test_meeus_jupiter.py, whose expected values are derived from this repository's own solver and are NOT printed in Meeus."
+        }
+    ]
 }

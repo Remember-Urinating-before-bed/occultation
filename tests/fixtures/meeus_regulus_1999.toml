@@ -11,6 +11,7 @@
 source = "Jean Meeus, Astronomical Tables, Occultations"
 example = "Example 5 - Occultation of Regulus, 1999 March 1"
 printed_pages = "228-229"
+pdf_pages = "10-11"
 
 [observer]
 # Project convention: east positive. Meeus prints 116.8640 degrees west.
@@ -50,3 +51,6 @@ limb_clearance_in_moon_radii = 0.1526
 position_angle_deg = 24.67
 altitude_deg = 43.0
 is_occultation = false
+# The star misses the Moon (limb clearance +0.1526), so nothing is hidden and
+# the event is not visible even though the altitude is positive.
+is_visible = false

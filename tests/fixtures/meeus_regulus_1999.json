@@ -4,7 +4,7 @@
     "example": "Example 5 - Occultation of Regulus, 1999 March 1",
     "printed_pages": "228-229",
     "pdf_pages": "10-11",
-    "note": "JSON twin of meeus_regulus_1999.toml. Every value was read off the scan by eye; OCR text is never a source of truth. The book prints the longitude west-positive (+116.8640); the project convention is east-positive, hence the sign flip on longitude_deg_east.",
+    "note": "JSON twin of meeus_regulus_1999.toml. Every value was read off the scan by eye; OCR text is never a source of truth. The book prints the longitude west-positive (+116.8640); the project convention is east-positive, hence the sign flip on longitude_deg_east. The event is not visible: the limb clearance is positive, so Regulus misses the Moon.",
     "tolerances": {
       "rho_sin_geocentric_latitude": 5e-07,
       "rho_cos_geocentric_latitude": 5e-07,
@@ -52,6 +52,7 @@
     "limb_clearance_in_moon_radii": 0.1526,
     "position_angle_deg": 24.67,
     "altitude_deg": 43.0,
-    "is_occultation": false
+    "is_occultation": false,
+    "is_visible": false
   }
 }

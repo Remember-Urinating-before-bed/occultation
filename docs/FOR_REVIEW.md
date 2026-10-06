@@ -1,8 +1,43 @@
 # For review — a runnable occultation CLI, and proof that it matches the book
 
 **Audience:** anyone who wants to check the work without reading Python.
-**Branch:** `feat/cli-local-circumstances`, merged into `develop`.
-**Date:** 2026-09-23.
+**Branch:** `feat/planet-local-circumstances` (planet branch), based on
+`develop`; the earlier star CLI work is `feat/cli-local-circumstances`,
+merged into `develop`.
+**Date:** 2026-09-23 (star CLI); planet branch added 2026-10-06, reflector
+review added 2026-10-06 (§13).
+
+---
+
+## 0. The planet branch (added 2026-10-06)
+
+The command line now takes `--body star|planet`. A **star** is a point at
+infinity: its declination is constant (`D1 = 0`) and the Moon's shadow is a
+cylinder of radius `k`. A **planet** is at a finite distance, so its declination
+drifts (`d = D0 + D1 t`) and the Moon's shadow is a cone of radius
+`L = k − ζF/1e6`; the planet branch also reports the two **contacts** — the
+moment its disk first touches the Moon's limb (immersion) and the moment it
+leaves (emersion). Setting `D1 = F = 0` reduces the code exactly to the star
+path, which is why the Regulus regression still passes unchanged.
+
+Both the closest approach and each contact now carry an **`is_visible`** flag:
+`is_occultation and altitude_deg > 0` (geometric horizon; refraction is
+deliberately deferred). The proof is Meeus Example 3 — occultation of Mars,
+1997 November 12, Uccle — where the immersion happens at `h = +66°` (visible)
+and the emersion at `h = −15°` (below the horizon), so the two contacts differ
+in visibility. That per-contact difference is what pins the definition.
+
+```bash
+uv run occultation local-circumstances \
+  --elements tests/fixtures/meeus_mars_1997.json \
+  --location config/locations/hong_kong.toml \
+  --delta-t-seconds 72 --body planet
+uv run pytest tests/reference_cases/test_meeus_mars.py -q
+```
+
+The formulas and their printed-page provenance are in
+`docs/algorithms/meeus-planet-local-circumstances.md`. The star sections below
+are unchanged and still accurate.
 
 ---
 
@@ -47,7 +82,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy src
 ```
 
 Command 1 currently prints `VERDICT: matches ...` and exits `0`. Command 4
-currently prints `41 passed`, `All checks passed!`, `26 files already
+currently prints `45 passed`, `All checks passed!`, `28 files already
 formatted`, and `Success: no issues found in 13 source files`.
 
 ## 3. The actual output of `verify meeus-example-5`
@@ -296,7 +331,9 @@ elements are the book's Palomar example, reused for a site 11 000 km away.
 | `src/occultation/reference/__init__.py` | new | Declares the reference-engine package and its one-way dependency rule. |
 | `src/occultation/reference/skyfield_engine.py` | new | The reference engine's placeholder. It raises instead of returning a number. |
 | `tests/fixtures/meeus_regulus_1999.json` | new | A JSON twin of the existing TOML fixture, carrying the book's printed values and the tolerances they justify. |
-| `tests/test_cli.py` | extended | 4 tests before, 17 now: exit codes, both input styles, JSON shape, the mismatch path. |
+| `tests/fixtures/meeus_mars_1997.{toml,json}` | new (2026-10-06) | The planet-branch fixture: Meeus Example 3 (Mars, 1997 November 12, Uccle), with `D1`, `F`, and the immersion/emersion contacts. |
+| `tests/reference_cases/test_meeus_mars.py` | new (2026-10-06) | The planet regression: closest approach, both contacts, and per-contact `is_visible`. |
+| `tests/test_cli.py` | extended | 4 tests before, 17 at the CLI change, 20 now: adds the `--body planet` text and JSON paths, the per-contact visibility, and the star-omits-contacts path. |
 | `tests/unit/test_elements_file.py` | new | 8 tests for the elements loader. |
 | `tests/unit/test_location_file.py` | new | 7 tests for the site loader. |
 | `tests/unit/test_reference_engine.py` | new | 3 tests that the reference engine refuses to answer. |
@@ -320,6 +357,9 @@ change only makes it reachable.
 --shadow-x0 --shadow-x1 --shadow-x2       the Moon's X polynomial
 --shadow-y0 --shadow-y1 --shadow-y2       the Moon's Y polynomial
 --shadow-radius-earth-radii               the Moon's radius k (default 0.272495)
+--declination-rate-deg-per-hour D1         the body's declination rate (0 for a star)
+--aberration-term F                         the Table III aberration term (0 for a star)
+--body star|planet                          star (default) or planet; planet adds contacts
 
 --location FILE            observer site (.json or .toml)
   or the inline equivalents:
@@ -468,9 +508,12 @@ $ uv run occultation local-circumstances ... --engine compare
                                                      -> exit 0, comparison: unavailable
 $ uv run occultation local-circumstances ... --engine skyfield
                                                      -> exit 3, no result printed
-$ uv run pytest -q                                   -> 41 passed
+$ uv run occultation local-circumstances --elements ...meeus_mars_1997.json \
+    --location ... --delta-t-seconds 72 --body planet
+                                                     -> exit 0, planet + contacts
+$ uv run pytest -q                                   -> 45 passed
 $ uv run ruff check .                                -> All checks passed!
-$ uv run ruff format --check .                       -> 26 files already formatted
+$ uv run ruff format --check .                       -> 28 files already formatted
 $ uv run mypy src                                    -> Success: no issues found in 13 source files
 $ uv run pytest --cov=occultation --cov-report=term-missing
                                                      -> TOTAL 90%
@@ -495,6 +538,12 @@ itself a test, so a transcription slip in either file fails the suite.
 - **The numbers are not observation-grade.** They reproduce a textbook example
   to the precision the textbook prints. Nothing here has been compared with
   real observations or with the Hong Kong Observatory's published almanac.
+- **No Hong Kong visibility sweep over the planets yet.** The planet branch and
+  `is_visible` are proved against Meeus Example 3 (Uccle), but there is no
+  fixture per planet for a Hong Kong observer. That needs one hand-transcribed
+  Table III row per event, cross-checked **by hand** against NAOJ, and is the
+  next increment (Jupiter first). See §13.10 for why the NAOJ check is a manual
+  step and not a script.
 - **The packaged wheel does not contain the fixture.** `uv build` produces a
   wheel containing only the `occultation` package (checked with `unzip -l`), so
   `occultation verify meeus-example-5` works from a source checkout, where the
@@ -530,7 +579,177 @@ itself a test, so a transcription slip in either file fails the suite.
    fixture so the wheel is self-contained, and then start milestone 1 so the
    comparison block can carry a real difference.
 
-## 13. Where to read more
+## 13. Reflector review (experienced software and data engineer, 2026-10-06)
+
+This is a self-review of the planet-branch diff, written after the branch was
+pushed. It is deliberately adversarial: the point is to name the places where
+this code could mislead a future reader or fail silently, not to congratulate
+the parts that work. Findings are ordered by how much damage they could do, and
+each one says what to do about it.
+
+> **Update 2026-10-06 (later the same day).** A question about the NAOJ
+> prediction service (https://eco.mtk.nao.ac.jp/cgi-bin/koyomi/cande/c_occulx_p_en.cgi)
+> prompted a check of how the "cross-checked against NAOJ" plan in §11 actually
+> works. It does not, yet — see **§13.10**. The NAOJ service is a validated
+> *reference*, never a runtime dependency (§3.3), so this changes the plan, not
+> the code.
+
+### 13.1 `is_planet` is a heuristic, not a fact (highest priority)
+
+`StarOccultationElements.is_planet` returns
+`declination_rate_deg_per_hour != 0.0 or aberration_term != 0.0`. That is a
+guess about intent inferred from a number. A planet whose tabulated `D1` happens
+to round to `0.0` — a body near a declination turning point — would be reported
+as a star. Today nothing branches on `is_planet` except display, so the blast
+radius is small, but it is exactly the kind of property that gets trusted later.
+**Recommendation:** if `is_planet` is ever to gate behaviour, replace it with an
+explicit field (or drive behaviour from the CLI's `body`), and keep the numeric
+short-circuit only as a documented fallback. Until then, note in the docstring
+that it is a display hint, not a classification.
+
+### 13.2 Float equality on `0.0` in the shadow-radius short-circuit
+
+`_effective_shadow_radius` returns `k` early when `aberration_term == 0.0`. The
+comparison is exact, which is safe *today* because `F` arrives as a literal or a
+JSON number. It stops being safe the moment `F` is computed from an ephemeris,
+where a mathematically-zero term can land on `1e-18` and silently take the other
+branch. **Recommendation:** either drop the short-circuit (the general formula
+already reduces to `k` when `F = 0`) or compare against a small epsilon with a
+comment explaining why exactness was assumed.
+
+### 13.3 `--body` and the numeric elements can disagree
+
+`--body` only decides whether contacts are computed and how the output is
+labelled; the physics is driven entirely by `D1` and `F`. So `--body star` with
+non-zero `D1`/`F` runs planet physics but prints "star", and `--body planet`
+with `D1 = F = 0` runs the star physics under a planet label. **Recommendation:**
+either derive the label from the elements, or validate that the flag and the
+numbers agree and reject the mismatch with a usage error — consistent with how
+the CLI already refuses to mix `--elements` with inline element options.
+
+### 13.4 A non-occulting `--body planet` run is silent
+
+When `result.is_occultation` is false, `_run_local_circumstances` skips the
+planet block and prints nothing about it. A user who asked for contacts gets an
+ordinary star-shaped answer with no explanation. **Recommendation:** emit a
+one-line note (stderr, or a `note` field in JSON) saying contacts were not
+computed because the body is not occulted at closest approach.
+
+### 13.5 Duplicated fixtures (TOML and JSON twins)
+
+Every example exists twice, hand-maintained. A test asserts the twins agree, so
+the duplication is checked rather than trusted — that is the right mitigation —
+but it is still two places to edit for every change. **Recommendation:** keep
+the equality test as the guard; if the duplication ever causes a real defect,
+promote one format to the source and generate the other.
+
+### 13.6 Tolerances are documentation, and should stay that way
+
+Encoding each tolerance next to the printed value it justifies, and defaulting in
+code, is a good pattern. The risk is that a failing test gets "fixed" by tuning a
+tolerance. **Recommendation:** keep the rule explicit in review — never tighten a
+tolerance below the precision the source prints, and never loosen one without
+citing a new printed digit.
+
+### 13.7 Coverage is measured but not enforced
+
+The suite reports ~90% coverage, but nothing fails the build when it drops. As
+the planet branch grows (one fixture per planet), it is easy to add paths that no
+test exercises. **Recommendation:** add `--cov-fail-under` to the CI gate at the
+current level so coverage can ratchet up but not silently down.
+
+### 13.8 What is genuinely good, and should not be "improved" away
+
+- **The reduction proof.** `D1 = F = 0` collapsing to the star path, with the
+  unchanged Regulus regression as the witness, is a real correctness argument,
+  not a claim. Keep it.
+- **Provenance discipline.** Printed page plus PDF page on every constant, OCR
+  demoted to a search index. This is the single most valuable habit in the
+  repository; the Jupiter increment must follow it exactly.
+- **Self-describing output.** Units and time scales in every key, `inputs` and
+  `derived` echoed, `is_visible` reported rather than implied. A stored result
+  answers "what was actually computed?" without the command that produced it.
+
+### 13.9 Verdict
+
+No blockers. 13.1 is the one item worth resolving before `is_planet` is relied
+on anywhere beyond display; the rest are hardening. The commit is safe to review
+as-is, and the next increment (the Hong Kong Jupiter sweep) should carry the
+provenance discipline of §13.8 forward.
+
+### 13.10 The "cross-checked against NAOJ" plan does not work as written
+
+§11 and `docs/algorithms/meeus-planet-local-circumstances.md` §9 both say the
+Hong Kong sweep needs "one hand-transcribed Table III row per event,
+cross-checked against NAOJ". The first half is fine. The second half cannot be
+done the way it reads, and this section records why, with evidence gathered
+2026-10-06.
+
+**What the NAOJ service actually is.** `c_occulx_p_en.cgi` is an interactive
+form (POST, `application/x-www-form-urlencoded`), not a data endpoint. Its
+fields are `NAO_id` (place id), `choice` (`0` major cities, `1` specify
+lat/lon/hgt, `2` favourites, `4` Google Maps), `lat`/`lon` as **DMS strings**
+(`"22 18"`, not decimal degrees), `hgt` in metres, `lst` (local standard time
+offset), `body` (`99` all planets, `88` visible-only, `1`–`8` per planet),
+`year` (2009–2027 only), plus buttons `btn00` (list events), `btn01` (local
+prediction), `btn02` (map), `btn07`/`btn08` (sun, starry view). A `Set` button
+per listed event (`pocl<YYYYMM>`) selects it before `btn01` is pressed.
+
+**Why a scripted fetch is fragile.** Three independent reasons:
+
+1. **The form is JavaScript-driven.** The place selector calls `set_lst()`,
+   which sets the time zone from the place id; `choice` is committed by
+   `set_nocalc()`, which submits the form immediately. A raw POST that skips
+   these leaves the server on its defaults — in my tests a POST carrying
+   `choice=1&lat=22 18 07&lon=114 10 28` was echoed back as the Tokyo default
+   `Lat.:35.6581 Lon.:139.7414`, i.e. the custom coordinates were silently
+   ignored. Getting a custom site to stick requires replaying the same sequence
+   the browser performs, which is exactly the kind of brittle scraping the
+   handoff's provenance rule exists to avoid.
+2. **The output is a rendered figure, not a table.** The local prediction comes
+   back as `mov<YYYYMM>.gif` plus a caption ("Not Visible", or the contact
+   figure). There is no machine-readable contact list to diff against, so an
+   automated comparison would mean OCR — which the repository forbids as
+   anything other than a search index.
+3. **The service is not a stable API.** The page footer says "We might modify
+   this program without notice (ver.2.0h)". A test that depends on the current
+   HTML would be a maintenance liability, not a regression guard.
+
+**What the plan should say instead.** Keep NAOJ as a *human* cross-check, and
+make the automated oracle something that is actually a data source. In order of
+preference:
+
+1. **A second independent algorithm over the same elements.** The strongest
+   check available today is to recompute the same event from the same
+   hand-transcribed Besselian elements by an independent route (for example the
+   direct topocentric angular-separation method, or a small step-by-step
+   propagation) and require the two to agree. That tests the implementation, not
+   the source, which is where transcription errors actually show up.
+2. **A published almanac, transcribed by hand.** The Hong Kong Observatory
+   almanac (already a validated reference in the handoff) or the NAOJ yearly
+   *list* of events — the dates, not the per-site contacts — can be hand-typed
+   into a fixture with printed-page provenance, exactly as the Meeus rows are.
+   This is a slow, deliberate, human step; it is not a script.
+3. **Occult v4 by David Herald**, already named in the handoff as the later
+   comparison target, once the project is far enough along to justify it.
+
+**Consequence for the next increment.** The Jupiter sweep should therefore
+proceed as: hand-transcribe the Table III row (with printed-page and PDF-page
+provenance), build the fixture, and *then* cross-check the resulting contact
+times against NAOJ **by hand** — opening the form in a browser for Hong Kong
+(lat `22 18`, lon `114 10`, `lst` 8, `body` 5, year 2026) and reading the
+rendered figure. The NAOJ dates for 2026 Jupiter are 2026-09-09, 2026-10-06,
+2026-11-03 and 2026-11-30; the 2026-10-06 event reports "Not Visible" for
+Tokyo, which is a useful negative check to reproduce for Hong Kong.
+
+**Recommendation:** fix the wording in §11 and in the algorithm doc so it says
+"cross-checked by hand against NAOJ", and record the NAOJ form's field
+conventions (DMS lat/lon, west-positive longitude is *not* used here — NAOJ
+takes east-positive decimal on the map but DMS degrees-minutes in the form) so
+the next person does not rediscover this. No code change is required; this is a
+documentation and process correction.
+
+## 14. Where to read more
 
 | If you want... | Read |
 | --- | --- |
@@ -538,5 +757,6 @@ itself a test, so a transcription slip in either file fails the suite.
 | The textbook chapter, drawn scenario by scenario | `docs/meeus-pictures.html` |
 | The code base, file by file | `docs/CODEBASE.md` |
 | The formulas and their printed-page provenance | `docs/algorithms/meeus-star-local-circumstances.md` |
+| The planet branch: `D1`, `ζ`, `F`, the cone-shaped shadow, and the contacts | `docs/algorithms/meeus-planet-local-circumstances.md` |
 | The tools used here (Python, uv, pytest, Git, CI), from zero | `docs/tooling.html` |
 | Constraints, defect history, roadmap | `docs/AGENT_HANDOFF.md` |

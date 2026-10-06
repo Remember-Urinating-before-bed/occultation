@@ -86,7 +86,8 @@ occultation/
 │   ├── domain/                   # pure data + validation, no maths
 │   │   ├── observer.py           # ObserverLocation
 │   │   └── occultation.py        # FundamentalPlanePolynomial, StarOccultationElements,
-│   │                             #   StarOccultationResult
+│   │                             #   StarOccultationResult, OccultationContact,
+│   │                             #   PlanetOccultationResult
 │   └── core/                     # custom maths (may not import occultation.reference)
 │       ├── observer_coordinates.py   # geographical → geocentric observer
 │       └── local_circumstances.py    # the iterative closest-approach solver
@@ -96,10 +97,13 @@ occultation/
     ├── unit/test_elements_file.py
     ├── unit/test_location_file.py
     ├── unit/test_reference_engine.py
-    ├── reference_cases/test_meeus_regulus.py   # the textbook regression
+    ├── reference_cases/test_meeus_regulus.py   # the star regression
+    ├── reference_cases/test_meeus_mars.py      # the planet regression
     └── fixtures/
         ├── meeus_regulus_1999.toml   # Example 5 inputs and expected values
-        └── meeus_regulus_1999.json   # the same, for the CLI; a test asserts equality
+        ├── meeus_regulus_1999.json   # the same, for the CLI; a test asserts equality
+        ├── meeus_mars_1997.toml      # Example 3, the planet branch
+        └── meeus_mars_1997.json      # the same, for the CLI
 ```
 
 `local/` also exists but is **git-ignored** (`local/.gitignore` contains `*`). It
@@ -121,13 +125,19 @@ west-positive, so every fixture flips the sign.
   `X0 + X1 t + X2 t²`, with `value_at(t)` and `rate_at(t)`.
 - `StarOccultationElements` — the event inputs: reference hour in Dynamical
   Time, star declination, Greenwich hour angle and its hourly rate, the two
-  shadow polynomials, and the shadow radius (`k = 0.272495` for a star).
-  The declination rate `D1` and aberration term `F` are deliberately absent:
-  both vanish for a star.
+  shadow polynomials, and the shadow radius (`k = 0.272495` for a star). The
+  declination rate `D1` and aberration term `F` default to `0.0`, which is the
+  star case; a planet supplies them (Table III) and `is_planet` becomes true.
 - `StarOccultationResult` — the answer: hours after reference, TD and UT hours,
   separation in Moon radii, position angle, altitude, `is_occultation`, and
   `iteration_count`. `limb_clearance_in_moon_radii` is a derived property
-  (`|separation| - 1`, negative when occulted).
+  (`|separation| - 1`, negative when occulted), and `is_visible` is
+  `is_occultation and altitude_deg > 0` (geometric horizon; refraction is
+  deferred to a later milestone).
+- `OccultationContact` — one contact (immersion or emersion): its name, TD/UT
+  hours, position angle, altitude, and its own `is_visible`.
+- `PlanetOccultationResult` — the closest approach plus both contacts; the
+  planet branch returns this instead of a bare `StarOccultationResult`.
 
 ### `src/occultation/core/observer_coordinates.py`
 
@@ -202,6 +212,9 @@ replaces the body with a real Skyfield calculation against a local ephemeris.
   importing `occultation.reference` does not import Skyfield.
 - `reference_cases/test_meeus_regulus.py` + `tests/fixtures/meeus_regulus_1999.toml`
   — the regression that pins the whole calculation to Meeus Example 5.
+- `reference_cases/test_meeus_mars.py` + `tests/fixtures/meeus_mars_1997.toml`
+  — the planet branch: non-zero `D1` and `F`, the cone-shaped shadow, and both
+  contacts, pinned to Meeus Example 3 (Mars, 1997 November 12, Uccle).
 
 
 ## 5. The regression that proves it works
@@ -236,6 +249,18 @@ Two traps this code base has already paid for, both documented in
    `|τ| < 1e-6` h. The test asserts that derived count; change the starting
    guess or the tolerance and you must re-derive it.
 
+### The planet branch
+
+Meeus Example 3 (Mars, 1997 November 12, Uccle) is the second regression, in
+`tests/reference_cases/test_meeus_mars.py`. It is the same solver with a
+non-zero declination rate `D1 = −0.00057` deg/h and aberration term `F = 21.25`,
+so the Moon's shadow is a cone of radius `L = k − ζF/1e6` rather than the star's
+cylinder, and the planet branch also returns the immersion and emersion
+contacts. Setting `D1 = F = 0` reduces the code exactly to the star path, which
+is why the Regulus regression still passes unchanged. The formulas and their
+printed-page provenance are in
+[`algorithms/meeus-planet-local-circumstances.md`](algorithms/meeus-planet-local-circumstances.md).
+
 ## 6. Run it
 
 ```bash
@@ -250,8 +275,9 @@ uv run occultation local-circumstances \
   --location config/locations/hong_kong.toml \
   --delta-t-seconds 65
 
-uv run pytest -q                # 40 tests
+uv run pytest -q                # 45 tests
 uv run pytest tests/reference_cases/test_meeus_regulus.py -q
+uv run pytest tests/reference_cases/test_meeus_mars.py -q
 uv run pytest --cov=occultation --cov-report=term-missing   # 90% coverage today
 
 uv run ruff check .             # lint
@@ -296,8 +322,12 @@ this set:
   therefore any real comparison difference. The package and the CLI seam exist;
   the engine raises.
 - Generation of the Besselian elements — they are inputs today.
-- Immersion and emersion (contact) times; the method starts from
-  `t ∓ sqrt(1 - Δ²)/n` on printed p. 226.
+- A Hong Kong visibility sweep over the eight planets. The planet branch and the
+  `is_visible` flag exist and are tested against Meeus Example 3, but a fixture
+  per planet (Jupiter first) that a Hong Kong observer could actually see is
+  still to be transcribed and cross-checked **by hand** against NAOJ. The NAOJ
+  service is an interactive form that returns a rendered figure, not a data
+  table, so this check cannot be scripted; see `docs/FOR_REVIEW.md` §13.10.
 - Lunar limb profile, grazing occultations, regional visibility.
 - Everything else in the almanac: Sun/Moon positions and events, twilight,
   phases, the 24 solar terms, planets, the batch pipeline, storage, and an API.
@@ -321,12 +351,16 @@ The next increments, in order:
 ## 10. Reading order
 
 1. [`explainer.html`](explainer.html) — the astronomy, in pictures.
-2. This file — the code base.
-3. [`tooling.html`](tooling.html) — the Python, uv, pytest, Git and CI
+2. [`teaching-example-5.html`](teaching-example-5.html) — one worked example
+   (Meeus Example 5) taught from zero, by hand and in code.
+3. This file — the code base.
+4. [`tooling.html`](tooling.html) — the Python, uv, pytest, Git and CI
    machinery, for readers with no tooling background.
-4. [`algorithms/meeus-star-local-circumstances.md`](algorithms/meeus-star-local-circumstances.md)
-   — the formulas and their provenance.
-5. [`FOR_REVIEW.md`](FOR_REVIEW.md) — what the CLI does, the proof it matches
+5. [`algorithms/meeus-star-local-circumstances.md`](algorithms/meeus-star-local-circumstances.md)
+   — the star formulas and their provenance.
+6. [`algorithms/meeus-planet-local-circumstances.md`](algorithms/meeus-planet-local-circumstances.md)
+   — the planet branch: `D1`, `ζ`, `F`, the cone-shaped shadow, and the contacts.
+7. [`FOR_REVIEW.md`](FOR_REVIEW.md) — what the CLI does, the proof it matches
    the book, and what is deliberately unfinished.
-6. [`AGENT_HANDOFF.md`](AGENT_HANDOFF.md) — constraints, defect history,
+8. [`AGENT_HANDOFF.md`](AGENT_HANDOFF.md) — constraints, defect history,
    roadmap, and the rules for contributing.
