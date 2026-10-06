@@ -18,6 +18,62 @@ example (Regulus, 1999 March 1, Palomar).
 | A short review note: what the CLI does and the proof it matches the book | [`docs/FOR_REVIEW.md`](docs/FOR_REVIEW.md) |
 | Constraints, defect history, and the milestone roadmap | [`docs/AGENT_HANDOFF.md`](docs/AGENT_HANDOFF.md) |
 
+## Install from scratch
+
+You need one tool: **[uv](https://docs.astral.sh/uv/)**. It fetches the right
+Python (3.12), builds the project's private environment, and installs the
+libraries — you do not need to install Python, pip, or a virtual environment
+yourself.
+
+**1. Install uv** (pick the line for your machine):
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# or, if you already use Homebrew
+brew install uv
+```
+
+Close and reopen your terminal (or `source ~/.local/bin/env` on macOS/Linux) so
+`uv` is on your `PATH`, then confirm it works:
+
+```bash
+uv --version
+```
+
+**2. Get the code and build the environment:**
+
+```bash
+git clone https://github.com/Remember-Urinating-before-bed/occultation.git
+cd occultation
+uv sync --locked --dev
+```
+
+`uv sync` creates `.venv/` and installs everything from `uv.lock`, so your
+machine matches CI exactly. You do **not** need to activate anything — `uv run`
+uses that environment for you.
+
+### Activating the environment (optional)
+
+`uv run <command>` is the recommended way to run things, because it always uses
+the project's environment without touching your shell. If you would rather have
+a shell where `python`, `pytest`, and `occultation` resolve to this project
+directly, activate the environment first:
+
+```bash
+source .venv/bin/activate        # macOS / Linux (bash, zsh)
+source .venv/bin/activate.fish   # fish
+.venv\Scripts\activate           # Windows (PowerShell / cmd)
+```
+
+Your prompt gains a `(.venv)` prefix. Inside it, plain `python`, `pytest`, and
+`occultation` work without the `uv run` prefix. Leave with `deactivate`. (If you
+use `uv run`, you never have to do this.)
+
 ## Quick start
 
 ```bash
