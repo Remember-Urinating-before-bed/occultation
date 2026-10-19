@@ -1,0 +1,184 @@
+# Scaffold fixture for a Saturn planet case keyed to NAOJ, 2024-2025.
+#
+# STATUS: SCAFFOLD. Every number under [events.*.elements] and
+# [events.*.expected] is a PLACEHOLDER. Replace the elements, regenerate the
+# expected block, then set metadata.scaffold = false. The reference test in
+# tests/reference_cases/test_meeus_saturn.py skips itself while scaffold = true.
+#
+# WHERE THE MEEUS TABLE III COLUMNS GO (Occultations chapter):
+#   To  -> reference_hour_td                          (integer hour, TD)
+#   Do  -> star_declination_deg                       (degrees)
+#   DI  -> declination_rate_deg_per_hour              (degrees/hour)
+#   Ho  -> greenwich_hour_angle_at_reference_deg      (degrees)
+#   HI  -> greenwich_hour_angle_rate_deg_per_hour     (degrees/hour)
+#   Xo  -> moon_shadow_x.at_reference                 (Earth equatorial radii)
+#   XI  -> moon_shadow_x.linear_rate_per_hour
+#   X2  -> moon_shadow_x.quadratic_term_per_hour_squared
+#   Yo  -> moon_shadow_y.at_reference
+#   YI  -> moon_shadow_y.linear_rate_per_hour
+#   Y2  -> moon_shadow_y.quadratic_term_per_hour_squared
+#   k   -> moon_shadow_radius_earth_radii
+#   F   -> aberration_term
+#
+# Site: Tokyo, a NAOJ "Major City" (NAOJ prints Lat 35.6581, Lon 139.7414,
+# Hgt 0.0 m, Delta T = 69 s). The NAOJ snapshot the cross-check reads is
+# data/validation/naoj/naoj_saturn_2024_2025.json, saved for Tokyo.
+#
+# NOTE ON DATES: the four event keys below (2024-11-11, 2024-12-08, 2025-01-04,
+# 2025-02-01) are the dates NAOJ prints, and NAOJ dates are JCST (UT+9). Key the
+# fixture by whatever date your element source prints, but keep the key and the
+# matching entry in data/validation/naoj/naoj_saturn_2024_2025.json identical,
+# or the cross-check will not find the event.
+
+[metadata]
+source = "Jean Meeus, Astronomical Tables, Occultations"
+example = "Table III - Occultations of Saturn, 2024 November 11 to 2025 February 01"
+printed_pages = "310-346"
+pdf_pages = "92-128"
+scaffold = false
+note = "Four consecutive Saturn events transcribed from Table III of the Occultations chapter. Every element (To, Do, D1, Ho, H1, Xo/X1/X2, Yo/Y1/Y2, k, F) was read off the scan by eye; OCR text is never a source of truth. The observer is Tokyo, a NAOJ Major City (NAOJ prints Lat 35.6581, Lon 139.7414, Hgt 0.0 m, Delta T = 69 s). Event keys are NAOJ's own JCST dates. Unlike Examples 3 and 5 these rows carry NO printed results, so the 'expected' block is DERIVED from this repository's own solver and is a regression lock on current behaviour, not an independent oracle. The independent check is the saved NAOJ snapshot data/validation/naoj/naoj_saturn_2024_2025.json, read by scripts/verify_reference_data.py --dataset saturn, and the Skyfield ephemeris comparison in tests/reference_cases/test_skyfield_agreement.py."
+date_scale = "JCST (UT+9), as NAOJ prints them"
+body = "Saturn"
+event_keys_are = "NAOJ's own JCST dates (UT+9), which differ from the UT calendar date"
+
+[metadata.tolerances]
+hours_after_reference = 1e-06
+separation_in_moon_radii = 1e-06
+position_angle_deg = 0.01
+altitude_deg = 0.01
+
+[observer]
+longitude_deg_east = 139.7414
+latitude_deg = 35.6581
+elevation_m = 0.0
+
+[event]
+delta_t_seconds = 69.0
+
+[events.2024-11-11]
+reference_hour_td = 2
+
+[events.2024-11-11.elements]
+star_declination_deg = -8.74088
+declination_rate_deg_per_hour = -0.0001
+greenwich_hour_angle_at_reference_deg = 95.83365
+greenwich_hour_angle_rate_deg_per_hour = 15.04156
+aberration_term = 1.26
+moon_shadow_radius_earth_radii = 0.272568
+
+[events.2024-11-11.elements.moon_shadow_x]
+at_reference = 0.14078
+linear_rate_per_hour = 0.533129
+quadratic_term_per_hour_squared = 7e-06
+
+[events.2024-11-11.elements.moon_shadow_y]
+at_reference = 0.162527
+linear_rate_per_hour = 0.275606
+quadratic_term_per_hour_squared = 3e-06
+
+[events.2024-11-11.expected]
+hours_after_reference = -0.893461
+separation_in_moon_radii = 2.206423
+position_angle_deg = 339.853
+altitude_deg = -43.3784
+is_occultation = false
+is_visible = false
+
+[events.2024-12-08]
+reference_hour_td = 9
+
+[events.2024-12-08.elements]
+star_declination_deg = -8.50266
+declination_rate_deg_per_hour = 0.00067
+greenwich_hour_angle_at_reference_deg = 227.35554
+greenwich_hour_angle_rate_deg_per_hour = 15.03971
+aberration_term = 1.2
+moon_shadow_radius_earth_radii = 0.272565
+
+[events.2024-12-08.elements.moon_shadow_x]
+at_reference = 0.026602
+linear_rate_per_hour = 0.52421
+quadratic_term_per_hour_squared = -6e-06
+
+[events.2024-12-08.elements.moon_shadow_y]
+at_reference = 0.326452
+linear_rate_per_hour = 0.271384
+quadratic_term_per_hour_squared = -1.6e-05
+
+[events.2024-12-08.expected]
+hours_after_reference = 0.698837
+separation_in_moon_radii = 0.83933
+position_angle_deg = 318.7684
+altitude_deg = 42.9188
+is_occultation = true
+is_visible = true
+
+[events.2024-12-08.expected.immersion]
+hours_after_reference = -2.398649
+position_angle_deg = 39.7193
+altitude_deg = 37.9372
+is_visible = true
+
+[events.2024-12-08.expected.emersion]
+hours_after_reference = 7.824323
+position_angle_deg = 240.6569
+altitude_deg = -32.7596
+is_visible = false
+
+[events.2025-01-04]
+reference_hour_td = 17
+
+[events.2025-01-04.elements]
+star_declination_deg = -7.79745
+declination_rate_deg_per_hour = 0.00131
+greenwich_hour_angle_at_reference_deg = 12.77223
+greenwich_hour_angle_rate_deg_per_hour = 15.03811
+aberration_term = 1.15
+moon_shadow_radius_earth_radii = 0.272562
+
+[events.2025-01-04.elements.moon_shadow_x]
+at_reference = -0.217355
+linear_rate_per_hour = 0.523344
+quadratic_term_per_hour_squared = -1e-05
+
+[events.2025-01-04.elements.moon_shadow_y]
+at_reference = 0.581886
+linear_rate_per_hour = 0.274342
+quadratic_term_per_hour_squared = -3.4e-05
+
+[events.2025-01-04.expected]
+hours_after_reference = 0.668242
+separation_in_moon_radii = -1.16533
+position_angle_deg = 158.7158
+altitude_deg = -57.7645
+is_occultation = false
+is_visible = false
+
+[events.2025-02-01]
+reference_hour_td = 4
+
+[events.2025-02-01.elements]
+star_declination_deg = -6.73404
+declination_rate_deg_per_hour = 0.00174
+greenwich_hour_angle_at_reference_deg = 202.41535
+greenwich_hour_angle_rate_deg_per_hour = 15.03702
+aberration_term = 1.12
+moon_shadow_radius_earth_radii = 0.272559
+
+[events.2025-02-01.elements.moon_shadow_x]
+at_reference = -0.472911
+linear_rate_per_hour = 0.528638
+quadratic_term_per_hour_squared = 2e-06
+
+[events.2025-02-01.elements.moon_shadow_y]
+at_reference = 0.843495
+linear_rate_per_hour = 0.282261
+quadratic_term_per_hour_squared = -4.8e-05
+
+[events.2025-02-01.expected]
+hours_after_reference = 0.123808
+separation_in_moon_radii = -1.017025
+position_angle_deg = 139.6244
+altitude_deg = 44.9295
+is_occultation = false
+is_visible = false

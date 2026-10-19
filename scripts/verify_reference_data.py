@@ -1,15 +1,28 @@
-"""Validate the saved NAOJ reference snapshot against this project's solver.
+"""Validate the saved NAOJ reference snapshots against this project's solver.
 
-The Jupiter rows of Meeus Table III carry no printed results, so their fixture
+The planet rows of Meeus Table III carry no printed results, so their fixture
 ``expected`` block is a regression lock derived from this repository's own code
 (see ``docs/algorithms/meeus-planet-local-circumstances.md`` §9). The one
 independent statement about those events that *is* machine-readable is NAOJ's
-per-event visibility status, saved under ``data/validation/naoj/``.
+per-event status, saved under ``data/validation/naoj/``.
 
-This script reads that snapshot, re-runs the solver for each event, and checks
-that this project agrees with NAOJ about which events are visible from Uccle.
-It is deliberately a script, not a pytest test: the snapshot is external data
-and the CI ``data`` job runs it explicitly.
+Two datasets are recorded, selected with ``--dataset``:
+
+``jupiter`` (default)
+    The four Jupiter events of 2019-2020 at Uccle. NAOJ renders those contact
+    times as a ``.gif`` image, so only the machine-readable "Not Visible" /
+    visible status text is captured, and the check compares ``is_visible``.
+
+``saturn``
+    The four Saturn events of 2024-2025 at Tokyo. Here NAOJ returns a visible
+    event as a *text* table, so the snapshot also records the contact times and
+    the Moon's altitude; this script compares visibility, and, when the visible
+    row's fixture elements are filled in (``metadata.scaffold`` is false), the
+    solver's contacts are checked against them too.
+
+This script reads a snapshot, re-runs the solver for each event, and checks that
+this project agrees with NAOJ. It is deliberately a script, not a pytest test:
+the snapshot is external data and the CI ``data`` job runs it explicitly.
 
 By default it prints one line per event (the NAOJ/custom verdict). Pass
 ``--trace`` to also print the intermediate value produced by each step of the
@@ -19,6 +32,11 @@ effective shadow radius L, the separation Delta, the position angle P and the
 altitude h -- so a reader can see *how* the final verdict was reached. The
 trace calls the very same helper functions the solver uses, so it cannot drift
 from the solver's own arithmetic.
+
+Pass ``--emit-expected`` to print, for every event, a ready-to-paste
+``[events.<date>.expected]`` TOML block derived from the solver. That is the
+step that fills a scaffold fixture's ``expected`` section without hand-typing
+the numbers.
 """
 
 from __future__ import annotations
@@ -47,10 +65,21 @@ from occultation.domain.occultation import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-SNAPSHOT_PATH = (
-    REPOSITORY_ROOT / "data" / "validation" / "naoj" / "naoj_jupiter_2019_2020.json"
-)
-FIXTURE_PATH = REPOSITORY_ROOT / "tests" / "fixtures" / "meeus_jupiter_2019_2020.toml"
+NAOJ_DIR = REPOSITORY_ROOT / "data" / "validation" / "naoj"
+FIXTURES_DIR = REPOSITORY_ROOT / "tests" / "fixtures"
+
+#: name -> (snapshot path, fixture path). ``--dataset`` selects the row.
+DATASETS: dict[str, tuple[Path, Path]] = {
+    "jupiter": (
+        NAOJ_DIR / "naoj_jupiter_2019_2020.json",
+        FIXTURES_DIR / "meeus_jupiter_2019_2020.toml",
+    ),
+    "saturn": (
+        NAOJ_DIR / "naoj_saturn_2024_2025.json",
+        FIXTURES_DIR / "meeus_saturn_2024_2025.toml",
+    ),
+}
+DEFAULT_DATASET = "jupiter"
 
 
 def _trace(
@@ -143,18 +172,80 @@ def _elements(fixture: dict[str, Any], date: str) -> StarOccultationElements:
     )
 
 
+def _expected_block(date: str, result: Any) -> str:
+    """Render a ready-to-paste ``[events.<date>.expected]`` TOML block."""
+    lines = [
+        f"[events.{date}.expected]",
+        f"hours_after_reference = {result.hours_after_reference:.6f}",
+        f"separation_in_moon_radii = {result.separation_in_moon_radii:.6f}",
+        f"position_angle_deg = {result.position_angle_deg:.4f}",
+        f"altitude_deg = {result.altitude_deg:.4f}",
+        f"is_occultation = {str(bool(result.is_occultation)).lower()}",
+        f"is_visible = {str(bool(result.is_visible)).lower()}",
+    ]
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--dataset",
+        choices=tuple(DATASETS),
+        default=DEFAULT_DATASET,
+        help=f"which saved NAOJ snapshot to check (default: {DEFAULT_DATASET})",
+    )
     parser.add_argument(
         "--trace",
         action="store_true",
         help="also print each intermediate value of the calculation",
     )
+    parser.add_argument(
+        "--emit-expected",
+        action="store_true",
+        help=(
+            "print a derived [events.<date>.expected] block per event instead of "
+            "the verdict, to fill a scaffold fixture"
+        ),
+    )
     arguments = parser.parse_args(argv)
 
-    snapshot = _load_json(SNAPSHOT_PATH)
-    with FIXTURE_PATH.open("rb") as fixture_file:
+    snapshot_path, fixture_path = DATASETS[arguments.dataset]
+    snapshot = _load_json(snapshot_path)
+    with fixture_path.open("rb") as fixture_file:
         fixture = tomllib.load(fixture_file)
+
+    if arguments.emit_expected:
+        observer = ObserverLocation(**fixture["observer"])
+        delta_t_seconds = fixture["event"]["delta_t_seconds"]
+        for event in snapshot["events"]:
+            date = event["date"]
+            if date not in fixture.get("events", {}):
+                print(f"# {date}: not present in {fixture_path.name}", file=sys.stderr)
+                continue
+            try:
+                result = calculate_star_local_circumstances(
+                    elements=_elements(fixture, date),
+                    observer=observer,
+                    delta_t_seconds=delta_t_seconds,
+                )
+            except ValueError as error:
+                print(
+                    f"# {date}: solver refused these elements ({error}); "
+                    "the fixture is probably still a scaffold",
+                    file=sys.stderr,
+                )
+                continue
+            print(_expected_block(date, result))
+        return 0
+
+    if fixture["metadata"].get("scaffold"):
+        print(
+            f"{fixture_path.name}: metadata.scaffold is true, so its elements are "
+            "placeholders. Fill them in, set scaffold = false, then re-run. "
+            "Use --emit-expected to generate the expected block first.",
+            file=sys.stderr,
+        )
+        return 1
 
     observer = ObserverLocation(**fixture["observer"])
     delta_t_seconds = fixture["event"]["delta_t_seconds"]

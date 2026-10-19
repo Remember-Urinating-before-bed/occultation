@@ -111,6 +111,27 @@ def test_the_jupiter_fixture_twins_agree() -> None:
     assert json_document["events"] == toml_document["events"]
 
 
+def test_the_saturn_fixture_twins_agree() -> None:
+    """The Saturn twins are hand-maintained; a slip in either one must fail.
+
+    This holds while the fixture is still a scaffold too: the placeholder values
+    in the two files must stay identical so that filling one in without the other
+    is caught here rather than in the reference test.
+    """
+    import tomllib
+
+    json_path = FIXTURE_PATH.parent / "meeus_saturn_2024_2025.json"
+    toml_path = FIXTURE_PATH.parent / "meeus_saturn_2024_2025.toml"
+    json_document = json.loads(json_path.read_text(encoding="utf-8"))
+    with toml_path.open("rb") as toml_file:
+        toml_document = tomllib.load(toml_file)
+
+    assert json_document["metadata"] == toml_document["metadata"]
+    assert json_document["observer"] == toml_document["observer"]
+    assert json_document["event"] == toml_document["event"]
+    assert json_document["events"] == toml_document["events"]
+
+
 def test_an_elements_mapping_is_accepted_on_its_own() -> None:
     """The inline command-line path passes an ``elements`` object directly."""
     document = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))

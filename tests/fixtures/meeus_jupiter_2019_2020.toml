@@ -17,6 +17,8 @@ example = "Table III - Occultations of Jupiter, 2019 November 28 to 2020 Februar
 printed_pages = "224-226"
 pdf_pages = "6-8"
 note = "Four consecutive Jupiter events transcribed from Table III of the Occultations chapter. The elements (T0, D0, D1, H0, H1, X0/X1/X2, Y0/Y1/Y2, k, F) were read off the scan by eye; OCR text is never a source of truth. The observer is Uccle (the site of Meeus Example 3) and Delta T = 69 s. Unlike Examples 3 and 5 these rows carry NO printed results, so the 'expected' block is DERIVED from this repository's own solver, not read from the book: it is a regression lock on current behaviour, not an independent oracle. Event 1 (2019-11-28) is a genuine occultation at Uccle; events 2-4 miss the Moon, so they report is_occultation = false and have no contacts."
+body = "Jupiter"
+event_keys_are = "universal-time dates (the calendar date of To - Delta T in UT)"
 
 [metadata.tolerances]
 hours_after_reference = 1e-06
@@ -46,12 +48,12 @@ moon_shadow_radius_earth_radii = 0.272608
 [events.2019-11-28.elements.moon_shadow_x]
 at_reference = 0.092336
 linear_rate_per_hour = 0.571548
-quadratic_term_per_hour_squared = -0.000024
+quadratic_term_per_hour_squared = -2.4e-05
 
 [events.2019-11-28.elements.moon_shadow_y]
 at_reference = 0.749714
 linear_rate_per_hour = -0.055842
-quadratic_term_per_hour_squared = 0.000003
+quadratic_term_per_hour_squared = 3e-06
 
 [events.2019-11-28.expected]
 hours_after_reference = -1.132058
@@ -87,12 +89,12 @@ moon_shadow_radius_earth_radii = 0.272608
 [events.2019-12-26.elements.moon_shadow_x]
 at_reference = 0.273307
 linear_rate_per_hour = 0.568795
-quadratic_term_per_hour_squared = -0.000015
+quadratic_term_per_hour_squared = -1.5e-05
 
 [events.2019-12-26.elements.moon_shadow_y]
 at_reference = 0.17645
 linear_rate_per_hour = -0.03015
-quadratic_term_per_hour_squared = 0.000032
+quadratic_term_per_hour_squared = 3.2e-05
 
 [events.2019-12-26.expected]
 hours_after_reference = -1.7779
@@ -116,12 +118,12 @@ moon_shadow_radius_earth_radii = 0.272611
 [events.2020-01-23.elements.moon_shadow_x]
 at_reference = 0.165739
 linear_rate_per_hour = 0.562303
-quadratic_term_per_hour_squared = 0.000007
+quadratic_term_per_hour_squared = 7e-06
 
 [events.2020-01-23.elements.moon_shadow_y]
 at_reference = -0.38284
 linear_rate_per_hour = -0.002948
-quadratic_term_per_hour_squared = 0.000056
+quadratic_term_per_hour_squared = 5.6e-05
 
 [events.2020-01-23.expected]
 hours_after_reference = -1.212275
@@ -145,12 +147,12 @@ moon_shadow_radius_earth_radii = 0.272617
 [events.2020-02-19.elements.moon_shadow_x]
 at_reference = 0.214422
 linear_rate_per_hour = 0.555796
-quadratic_term_per_hour_squared = 0.000012
+quadratic_term_per_hour_squared = 1.2e-05
 
 [events.2020-02-19.elements.moon_shadow_y]
 at_reference = -0.990496
 linear_rate_per_hour = 0.022575
-quadratic_term_per_hour_squared = 0.000078
+quadratic_term_per_hour_squared = 7.8e-05
 
 [events.2020-02-19.expected]
 hours_after_reference = 0.177812

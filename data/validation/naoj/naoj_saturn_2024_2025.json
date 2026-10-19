@@ -1,0 +1,58 @@
+{
+  "$schema_version": 1,
+  "kind": "reference-validation",
+  "name": "naoj-saturn-occultations-2024-2025",
+  "source": "https://eco.mtk.nao.ac.jp/cgi-bin/koyomi/cande/c_occulx_p_en.cgi",
+  "source_description": "NAOJ lunar-occultation prediction form (Local Prediction), saved for the four Saturn events of 2024 November to 2025 February, for Tokyo.",
+  "site": {
+    "name": "Tokyo",
+    "NAO_id": "13",
+    "longitude_deg_east": 139.7414,
+    "latitude_deg": 35.6581,
+    "elevation_m": 0.0,
+    "timezone_offset_hours": 9
+  },
+  "retrieved": "2026-10-20",
+  "transcription_note": "Saved NAOJ Local Prediction pages. For a visible event NAOJ prints the per-event circumstances as an HTML table (time zone JCST, UT+9); for a site that misses the event it prints only the words 'Not Visible'. Unlike the Jupiter snapshot, the visible event's contact times here are machine-readable text, so they are captured; the map figure is not OCR'd. 'status' is NAOJ's own wording; 'is_visible' is the boolean this project reads from it.",
+  "events": [
+    {
+      "date": "2024-11-11",
+      "body": "Saturn",
+      "status": "Not Visible",
+      "is_visible": false
+    },
+    {
+      "date": "2024-12-08",
+      "body": "Saturn",
+      "status": "Visible",
+      "is_visible": true,
+      "contacts_ut": {
+        "disappearance_starts": "09:19:12",
+        "disappearance_ends": "09:20:28",
+        "least_angular_distance": "09:40:45",
+        "reappearance_starts": "10:00:44",
+        "reappearance_ends": "10:01:58"
+      },
+      "moon_altitude_deg_at_least_distance": 42.8,
+      "moon_azimuth_deg_at_least_distance": 203.4,
+      "project_solver_least_distance": {
+        "note": "This project's own solver, using the elements as transcribed (D0 sign corrected to -8.50266 on 2026-10-20). Recorded so that the sign error found by line 2026-10-20 cannot silently return: with D0 positive the same code reports 09:18:37 UT and +60.80 deg.",
+        "least_angular_distance_ut": "09:40:47",
+        "moon_altitude_deg_at_least_distance": 42.92,
+        "agrees_with_naoj": true
+      }
+    },
+    {
+      "date": "2025-01-04",
+      "body": "Saturn",
+      "status": "Not Visible",
+      "is_visible": false
+    },
+    {
+      "date": "2025-02-01",
+      "body": "Saturn",
+      "status": "Not Visible",
+      "is_visible": false
+    }
+  ]
+}
