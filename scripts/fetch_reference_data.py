@@ -12,7 +12,10 @@ Two subcommands:
     ``curl`` command that would download it. Nothing is downloaded unless the
     entry is a plain URL dataset; a ``reference-validation`` entry is a
     human-saved snapshot and is only reported, never fetched. Pass ``--download``
-    to actually run the downloads into ``data/external/``.
+    to actually run the downloads into ``data/external/``. Where ``curl`` is
+    absent — some CI images are minimal — the download falls back to
+    :mod:`urllib.request`, so the job does not depend on which tools the image
+    happens to ship.
 
 ``verify``
     Recompute the SHA-256 of every dataset that has a real checksum and compare
@@ -30,8 +33,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +45,10 @@ MANIFEST_PATH = REPOSITORY_ROOT / "data" / "manifest.json"
 EXTERNAL_DIR = REPOSITORY_ROOT / "data" / "external"
 
 PLACEHOLDER_CHECKSUM = "PLACEHOLDER"
+
+#: Downloaded files are large (de440s.bsp is 32 MB); a stall should fail rather
+#: than hang a CI job until its own timeout.
+DOWNLOAD_TIMEOUT_SECONDS = 300.0
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -60,10 +69,42 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _fetch(datasets: list[dict[str, Any]], *, download: bool) -> int:
+def _download(source: str, destination: Path) -> None:
+    """Download ``source`` to ``destination``, with or without ``curl``.
+
+    A minimal image (some CI runners) has no ``curl``; rather than make the job
+    depend on which tools happen to be installed, the fallback is the standard
+    library. Both take the same URL and write the same bytes, so the checksum
+    that follows is the same either way.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if shutil.which("curl"):
+        subprocess.run(
+            [
+                "curl",
+                "--fail",
+                "--location",
+                "--output",
+                str(destination),
+                source,
+            ],
+            check=True,
+            timeout=DOWNLOAD_TIMEOUT_SECONDS,
+        )
+        return
+    print(f"curl not found; using urllib for {source}", file=sys.stderr)
+    with urllib.request.urlopen(source, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+        destination.write_bytes(response.read())
+
+
+def _fetch(
+    datasets: list[dict[str, Any]], *, download: bool, only: str | None = None
+) -> int:
     exit_code = 0
     for dataset in datasets:
         name = dataset.get("name", "<unnamed>")
+        if only is not None and name != only:
+            continue
         source = dataset.get("source")
         kind = dataset.get("kind", "url")
         if kind == "reference-validation":
@@ -76,26 +117,34 @@ def _fetch(datasets: list[dict[str, Any]], *, download: bool) -> int:
             exit_code = 1
             continue
         destination = EXTERNAL_DIR / Path(str(dataset.get("path", name))).name
-        command = [
-            "curl",
-            "--fail",
-            "--location",
-            "--output",
-            str(destination),
-            str(source),
-        ]
-        print(" ".join(command))
+        print(
+            f"curl --fail --location --output {destination} {source}"
+            if shutil.which("curl")
+            else f"(urllib) {source} -> {destination}"
+        )
         if download:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(command, check=True)
-            print(f"{name}: downloaded {_sha256(destination)}")
+            _download(str(source), destination)
+            actual = _sha256(destination)
+            recorded = str(dataset.get("sha256", PLACEHOLDER_CHECKSUM))
+            print(f"{name}: downloaded {actual}")
+            if recorded != PLACEHOLDER_CHECKSUM and actual != recorded:
+                print(
+                    f"{name}: MISMATCH after download: recorded {recorded} "
+                    f"actual {actual}",
+                    file=sys.stderr,
+                )
+                exit_code = 1
     return exit_code
 
 
-def _verify(datasets: list[dict[str, Any]], *, allow_unrecorded: bool) -> int:
+def _verify(
+    datasets: list[dict[str, Any]], *, allow_unrecorded: bool, only: str | None = None
+) -> int:
     exit_code = 0
     for dataset in datasets:
         name = dataset.get("name", "<unnamed>")
+        if only is not None and name != only:
+            continue
         recorded = str(dataset.get("sha256", PLACEHOLDER_CHECKSUM))
         path_value = dataset.get("path")
         if not path_value:
@@ -132,6 +181,11 @@ def main(argv: list[str] | None = None) -> int:
     fetch_parser.add_argument(
         "--download", action="store_true", help="actually download into data/external/"
     )
+    fetch_parser.add_argument(
+        "--only",
+        metavar="NAME",
+        help="restrict the operation to one manifest entry by name",
+    )
     verify_parser = subparsers.add_parser(
         "verify", help="check every recorded checksum"
     )
@@ -140,13 +194,20 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="treat a PLACEHOLDER checksum as a warning rather than a failure",
     )
+    verify_parser.add_argument(
+        "--only",
+        metavar="NAME",
+        help="restrict the operation to one manifest entry by name",
+    )
     arguments = parser.parse_args(argv)
 
     document = _load_manifest(arguments.manifest)
     datasets = document["datasets"]
     if arguments.command == "fetch":
-        return _fetch(datasets, download=arguments.download)
-    return _verify(datasets, allow_unrecorded=arguments.allow_unrecorded)
+        return _fetch(datasets, download=arguments.download, only=arguments.only)
+    return _verify(
+        datasets, allow_unrecorded=arguments.allow_unrecorded, only=arguments.only
+    )
 
 
 if __name__ == "__main__":
