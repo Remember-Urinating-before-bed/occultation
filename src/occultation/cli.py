@@ -13,10 +13,11 @@ Exit codes:
 - ``1`` the calculation ran but a published value did not match (``verify``);
 - ``2`` bad usage or bad input (argparse, missing file, malformed document,
   rejected value);
-- ``3`` the reference engine was requested but is not available.
+- ``3`` the reference engine was requested but could not be used.
 """
 
 import argparse
+import datetime as dt
 import json
 import sys
 from collections.abc import Sequence
@@ -47,7 +48,13 @@ from occultation.io.location_file import (
     load_observer_location,
     observer_from_mapping,
 )
-from occultation.reference import ReferenceEngineUnavailable, SkyfieldEngine
+from occultation.reference import (
+    BODY_TARGETS,
+    UNAVAILABLE_REASON,
+    ReferenceEngineError,
+    ReferenceEngineUnavailable,
+    SkyfieldEngine,
+)
 
 EXIT_OK = 0
 EXIT_MISMATCH = 1
@@ -110,7 +117,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments.command == "local-circumstances":
             return _run_local_circumstances(arguments)
         return _run_verify(arguments)
-    except ReferenceEngineUnavailable as error:
+    except (ReferenceEngineUnavailable, ReferenceEngineError) as error:
         print(f"occultation: error: {error}", file=sys.stderr)
         return EXIT_REFERENCE_UNAVAILABLE
     except (ElementsFileError, LocationFileError, ValueError, RuntimeError) as error:
@@ -155,9 +162,30 @@ def _add_local_circumstances_parser(
         default="custom",
         help=(
             "custom: this repository's own maths (default); "
-            "skyfield: the reference engine, not implemented yet, exits 3; "
-            "compare: run the custom engine and report the reference engine's "
-            "availability"
+            "skyfield: the Skyfield reference engine, which needs "
+            "--reference-body and --epoch-ut, exits 3 without them; "
+            "compare: run the custom engine and report the difference against "
+            "the Skyfield engine"
+        ),
+    )
+    parser.add_argument(
+        "--reference-body",
+        choices=tuple(sorted(BODY_TARGETS)),
+        metavar="BODY",
+        help=(
+            "body to compare against with --engine skyfield|compare; a Meeus "
+            "element set carries no date, so the reference engine needs the body "
+            f"named separately (one of: {', '.join(sorted(BODY_TARGETS))})"
+        ),
+    )
+    parser.add_argument(
+        "--epoch-ut",
+        metavar="ISO8601",
+        help=(
+            "an instant in UT near the event, e.g. 2024-12-08T08:58:51Z, used to "
+            "seed the reference engine's search for the least separation; "
+            "required by --engine skyfield|compare, and the search is allowed to "
+            "move several hours from it"
         ),
     )
     parser.add_argument(
@@ -354,19 +382,19 @@ def _validate_body_against_elements(
 
 
 def _run_local_circumstances(arguments: argparse.Namespace) -> int:
-    elements = _resolve_elements(arguments)
-    _validate_body_against_elements(arguments.body, elements)
     observer = _resolve_observer(arguments)
     if arguments.engine == "skyfield":
-        # Fail loudly rather than print a custom-core answer under a reference
-        # label: the handoff forbids presenting one engine's result as another's.
-        # Nothing is printed, because there is no result to print and a partial
-        # document would be mistaken for one.
-        SkyfieldEngine().star_local_circumstances(
-            elements=elements,
-            observer=observer,
-            delta_t_seconds=arguments.delta_t_seconds,
-        )
+        # The reference engine needs a body, an epoch and an observer — not a
+        # Meeus element set, which carries no date to give it. So this path is
+        # taken before elements are resolved at all, which is what lets a new
+        # event be checked against the ephemeris *before* its elements have been
+        # transcribed. Fail loudly rather than print a custom-core answer under a
+        # reference label: the handoff forbids presenting one engine's result as
+        # another's.
+        return _run_skyfield_only(arguments, observer=observer)
+
+    elements = _resolve_elements(arguments)
+    _validate_body_against_elements(arguments.body, elements)
     result = _calculate(
         elements=elements,
         observer=observer,
@@ -398,7 +426,13 @@ def _run_local_circumstances(arguments: argparse.Namespace) -> int:
         else None
     )
     comparison = _comparison_block(
-        arguments.engine, elements=elements, observer=observer
+        arguments.engine,
+        elements=elements,
+        observer=observer,
+        result=result,
+        reference_body=arguments.reference_body,
+        epoch_ut=arguments.epoch_ut,
+        delta_t_seconds=arguments.delta_t_seconds,
     )
     if arguments.format == "json":
         print(
@@ -559,40 +593,181 @@ def _calculate(
     )
 
 
+def _parse_epoch_ut(text: str) -> dt.datetime:
+    """Parse ``--epoch-ut``; accepts ``Z`` and a trailing offset."""
+    cleaned = text.strip().replace("Z", "+00:00")
+    try:
+        parsed = dt.datetime.fromisoformat(cleaned)
+    except ValueError as error:
+        raise ValueError(
+            f"--epoch-ut {text!r} is not an ISO-8601 instant (try 2024-12-08T08:58:51Z)"
+        ) from error
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.UTC)
+    return parsed
+
+
+def _run_skyfield_only(
+    arguments: argparse.Namespace, *, observer: ObserverLocation
+) -> int:
+    """``--engine skyfield``: the reference answer on its own, clearly labelled.
+
+    This is the mode a new test case is checked with: the reference engine needs
+    only a body and an instant, so it can be asked about an event before any
+    Meeus element has been transcribed. The output says ``reference`` so that a
+    reader cannot mistake it for this repository's own calculation.
+    """
+    if arguments.reference_body is None:
+        # The reference engine has no way to know *which* body from a Meeus
+        # element set, so this is the case the element-path refusal message
+        # exists for. Raising the engine's own reason keeps one wording for one
+        # situation, whether it is reached here or by a direct caller.
+        raise ReferenceEngineUnavailable(UNAVAILABLE_REASON)
+    if arguments.epoch_ut is None:
+        raise ValueError(
+            "--engine skyfield needs --epoch-ut, an instant in UT near the "
+            "event (try --epoch-ut 2024-12-08T08:58:51Z); a Meeus element set "
+            "carries no date to derive one from"
+        )
+    circumstances = SkyfieldEngine().body_local_circumstances(
+        str(arguments.reference_body),
+        _parse_epoch_ut(arguments.epoch_ut),
+        observer,
+    )
+    if arguments.format == "json":
+        print(
+            json.dumps(
+                {
+                    "engine": "skyfield",
+                    "note": (
+                        "this is an independent reference calculation from a JPL "
+                        "ephemeris, not this repository's own Besselian solver; "
+                        "the two use different definitions of the Moon's radius"
+                    ),
+                    "reference": _reference_payload(circumstances),
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(_format_reference(circumstances))
+    return EXIT_OK
+
+
+def _reference_payload(circumstances: Any) -> dict[str, Any]:
+    """The reference answer as JSON-ready values.
+
+    Skyfield returns NumPy scalars, which ``json`` refuses to serialise, so every
+    number is cast to a built-in here. The casts are done explicitly rather than
+    with a default= hook so that a value of an unexpected type fails loudly
+    instead of being stringified into the document.
+    """
+    payload = asdict(circumstances)
+    payload["universal_time"] = circumstances.universal_time.isoformat()
+    payload["is_occultation"] = bool(circumstances.is_occultation)
+    payload["is_visible"] = bool(circumstances.is_visible)
+    for key, value in payload.items():
+        if key in ("body", "universal_time") or isinstance(value, bool):
+            continue
+        payload[key] = float(value)
+    return payload
+
+
+def _format_reference(circumstances: Any) -> str:
+    return "\n".join(
+        [
+            (
+                f"Reference circumstances of {circumstances.body} from the Moon "
+                "(JPL DE440s via Skyfield)"
+            ),
+            "engine   : skyfield (independent of this repository's Besselian solver)",
+            (
+                "instant  : "
+                f"{circumstances.universal_time.strftime('%Y-%m-%d %H:%M:%S')} UT"
+            ),
+            (
+                "Delta    : "
+                f"{circumstances.separation_in_moon_radii:+.4f} Moon radii "
+                f"({circumstances.angular_separation_deg:.4f} deg)"
+            ),
+            f"P        : {circumstances.position_angle_deg:.2f} deg",
+            f"h (Moon) : {circumstances.moon_altitude_deg:+.2f} deg",
+            f"occulted?: {'yes' if circumstances.is_occultation else 'no'}",
+            f"visible? : {'yes' if circumstances.is_visible else 'no'}",
+        ]
+    )
+
+
 def _comparison_block(
     engine: str,
     *,
     elements: StarOccultationElements,
     observer: ObserverLocation,
+    result: StarOccultationResult | None = None,
+    reference_body: str | None = None,
+    epoch_ut: str | None = None,
+    delta_t_seconds: float | None = None,
 ) -> dict[str, Any] | None:
-    """Report the reference engine's availability without inventing a number.
+    """Report the reference engine's view of the same event.
 
-    The probe passes the real elements and observer, so that the day the engine
-    starts working this function needs no change. ``delta_t_seconds`` is 0.0 on
-    purpose: the probe must not depend on a caller-supplied value it does not
-    have, and today's placeholder ignores every argument.
+    With a body and an epoch the reference engine can be asked, and this returns
+    the two engines' answers side by side. Without them there is nothing to ask
+    it — a Meeus element set carries no date — so the block explains that rather
+    than inventing a number to compare against.
     """
     if engine == "custom":
         return None
-    try:
-        SkyfieldEngine().star_local_circumstances(
-            elements=elements,
-            observer=observer,
-            delta_t_seconds=0.0,
-        )
-    except ReferenceEngineUnavailable as error:
-        reason = str(error)
-    else:  # pragma: no cover - the placeholder always raises today
-        reason = "available"
-    return {
+    if reference_body is None or epoch_ut is None:
+        try:
+            SkyfieldEngine().star_local_circumstances(
+                elements=elements,
+                observer=observer,
+                delta_t_seconds=delta_t_seconds or 0.0,
+            )
+        except ReferenceEngineUnavailable as error:
+            reason = str(error)
+        else:  # pragma: no cover - the element path always raises
+            reason = "available"
+        return {
+            "reference_engine": "skyfield",
+            "status": "not_compared",
+            "reason": reason,
+            "note": (
+                "no difference is reported because the reference engine needs a "
+                "body and an epoch; pass --reference-body and --epoch-ut"
+            ),
+        }
+
+    circumstances = SkyfieldEngine().body_local_circumstances(
+        reference_body, _parse_epoch_ut(epoch_ut), observer
+    )
+    payload: dict[str, Any] = {
         "reference_engine": "skyfield",
-        "status": "unavailable" if reason != "available" else "available",
-        "reason": reason,
+        "status": "compared",
+        "reference": _reference_payload(circumstances),
         "note": (
-            "no difference is reported because the reference engine has not been "
-            "implemented; the custom result above stands on its own"
+            "the two engines use different definitions of the Moon's radius "
+            "(Meeus's fixed k against Skyfield's true distance), so the "
+            "separation differs at the 0.1% level by construction"
         ),
     }
+    if result is not None:
+        payload["difference"] = {
+            "separation_in_moon_radii": (
+                abs(circumstances.separation_in_moon_radii)
+                - abs(result.separation_in_moon_radii)
+            ),
+            "position_angle_deg": _angle_difference(
+                circumstances.position_angle_deg, result.position_angle_deg
+            ),
+            "altitude_deg": (circumstances.moon_altitude_deg - result.altitude_deg),
+        }
+    return payload
+
+
+def _angle_difference(left_deg: float, right_deg: float) -> float:
+    """Signed difference wrapped into ``(-180, 180]``."""
+    return (left_deg - right_deg + 180.0) % 360.0 - 180.0
 
 
 def _result_payload(result: StarOccultationResult) -> dict[str, Any]:
@@ -727,14 +902,33 @@ def _format_result(
             ),
         ]
     if comparison is not None:
-        lines += [
-            "",
-            (
-                f"comparison: reference engine '{comparison['reference_engine']}' is "
-                f"{comparison['status']}"
-            ),
-            f"            {comparison['reason']}",
-        ]
+        lines.append("")
+        lines.append(
+            "comparison: reference engine "
+            f"'{comparison['reference_engine']}' {comparison['status']}"
+        )
+        if "reference" in comparison:
+            reference = comparison["reference"]
+            difference = comparison.get("difference", {})
+            lines += [
+                (
+                    "  reference: "
+                    f"Delta = {reference['separation_in_moon_radii']:+.4f}, "
+                    f"P = {reference['position_angle_deg']:.2f} deg, "
+                    f"h = {reference['moon_altitude_deg']:+.2f} deg, "
+                    f"UT {reference['universal_time'][11:19]}"
+                ),
+                (
+                    "  difference: "
+                    f"Delta {difference.get('separation_in_moon_radii', 0.0):+.5f}, "
+                    f"P {difference.get('position_angle_deg', 0.0):+.2f} deg, "
+                    f"h {difference.get('altitude_deg', 0.0):+.3f} deg"
+                ),
+            ]
+        elif "reason" in comparison:
+            lines.append(f"  {comparison['reason']}")
+        if "note" in comparison:
+            lines.append(f"  note: {comparison['note']}")
     return "\n".join(lines)
 
 

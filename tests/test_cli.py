@@ -204,10 +204,15 @@ def test_local_circumstances_accepts_inline_parameters(
     assert file_document["result"] == inline_document["result"]
 
 
-def test_local_circumstances_compare_reports_the_missing_reference_engine(
+def test_local_circumstances_compare_without_a_body_reports_no_difference(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """``--engine compare`` must not invent a reference number (decision Q13b)."""
+    """``--engine compare`` must not invent a reference number (decision Q13b).
+
+    A Meeus element set carries no date, so the reference engine has nothing to
+    be asked. The block must say so rather than print a number beside the custom
+    one as though the two had been compared.
+    """
     exit_code = main(
         [
             "local-circumstances",
@@ -229,14 +234,15 @@ def test_local_circumstances_compare_reports_the_missing_reference_engine(
     document = json.loads(captured.out)
     assert document["result"]["iteration_count"] == 4
     assert document["comparison"]["reference_engine"] == "skyfield"
-    assert document["comparison"]["status"] == "unavailable"
-    assert "not implemented" in document["comparison"]["reason"]
+    assert document["comparison"]["status"] == "not_compared"
+    assert "no calendar date" in document["comparison"]["reason"]
+    assert "reference" not in document["comparison"]
 
 
-def test_local_circumstances_skyfield_exits_three(
+def test_local_circumstances_skyfield_without_a_body_exits_three(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Requesting the reference engine fails loudly instead of faking a result."""
+    """Requesting the reference engine from elements alone fails loudly."""
     exit_code = main(
         [
             "local-circumstances",
@@ -254,7 +260,60 @@ def test_local_circumstances_skyfield_exits_three(
     captured = capsys.readouterr()
     assert exit_code == EXIT_REFERENCE_UNAVAILABLE
     assert captured.out == ""
-    assert "not implemented" in captured.err
+    assert "--reference-body" in captured.err
+    assert "--epoch-ut" in captured.err
+
+
+def test_local_circumstances_skyfield_needs_an_epoch(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A body without an epoch is still incomplete, and says which flag is missing."""
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--elements",
+            str(ELEMENTS_FIXTURE),
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "65",
+            "--engine",
+            "skyfield",
+            "--reference-body",
+            "saturn",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_USAGE
+    assert captured.out == ""
+    assert "--epoch-ut" in captured.err
+
+
+def test_local_circumstances_rejects_a_malformed_epoch(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--elements",
+            str(ELEMENTS_FIXTURE),
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "65",
+            "--engine",
+            "skyfield",
+            "--reference-body",
+            "saturn",
+            "--epoch-ut",
+            "yesterday",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_USAGE
+    assert "ISO-8601" in captured.err
 
 
 def test_local_circumstances_skyfield_prints_nothing_even_as_json(
@@ -284,7 +343,7 @@ def test_local_circumstances_skyfield_prints_nothing_even_as_json(
     captured = capsys.readouterr()
     assert exit_code == EXIT_REFERENCE_UNAVAILABLE
     assert captured.out == ""
-    assert "not implemented" in captured.err
+    assert "--reference-body" in captured.err
 
 
 def test_local_circumstances_rejects_mixing_file_and_inline_inputs(
@@ -669,3 +728,119 @@ def test_local_circumstances_non_occulting_planet_note_in_text(
     assert exit_code == EXIT_OK
     assert "\ncontacts\n" not in captured.out
     assert "note: contacts were not computed" in captured.out
+
+
+def _skips_without_ephemeris() -> None:
+    from occultation.reference import DEFAULT_EPHEMERIS_PATH, SkyfieldEngine
+
+    if not SkyfieldEngine().is_available():
+        pytest.skip(f"no reference ephemeris at {DEFAULT_EPHEMERIS_PATH}")
+
+
+def test_engine_skyfield_answers_without_any_elements(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The reference engine needs a body and an instant, never a Meeus element set.
+
+    This is what lets a candidate event be measured against the ephemeris before
+    anyone has transcribed its elements, which is the order step 1 of the guide
+    recommends.
+    """
+    _skips_without_ephemeris()
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "69",
+            "--engine",
+            "skyfield",
+            "--reference-body",
+            "saturn",
+            "--epoch-ut",
+            "2024-12-08T08:58:51Z",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_OK
+    # Labelled as a reference answer, never as this repository's own.
+    assert "engine   : skyfield" in captured.out
+    assert "Reference circumstances" in captured.out
+    assert "custom" not in captured.out
+    # The Moon's own altitude and the answer's units are both reported.
+    assert "Moon radii" in captured.out
+
+
+def test_engine_skyfield_json_says_which_engine_answered(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A machine reader must be able to tell the two engines apart from the JSON."""
+    _skips_without_ephemeris()
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "69",
+            "--engine",
+            "skyfield",
+            "--reference-body",
+            "saturn",
+            "--epoch-ut",
+            "2024-12-08T08:58:51Z",
+            "--format",
+            "json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_OK
+    document = json.loads(captured.out)
+    assert document["engine"] == "skyfield"
+    # No "result" key: nothing here is the custom engine's answer.
+    assert "result" not in document
+    assert document["reference"]["body"] == "saturn"
+    assert "is_occultation" in document["reference"]
+    assert document["reference"]["universal_time"].endswith("+00:00")
+
+
+def test_engine_compare_reports_the_difference_when_given_a_body(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """With a body and an epoch, both engines run and the difference is reported."""
+    _skips_without_ephemeris()
+    exit_code = main(
+        [
+            "local-circumstances",
+            "--elements",
+            str(ELEMENTS_FIXTURE),
+            "--location",
+            str(HONG_KONG_LOCATION),
+            "--delta-t-seconds",
+            "69",
+            "--engine",
+            "compare",
+            "--reference-body",
+            "saturn",
+            "--epoch-ut",
+            "2024-12-08T08:58:51Z",
+            "--format",
+            "json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_OK
+    document = json.loads(captured.out)
+    assert document["engine"] == "custom"
+    comparison = document["comparison"]
+    assert comparison["status"] == "compared"
+    assert comparison["reference"]["body"] == "saturn"
+    # Both answers are present, and the difference is stated in the same units
+    # the custom result uses.
+    assert "difference" in comparison
+    assert "separation_in_moon_radii" in comparison["difference"]
+    assert "Moon's radius" in comparison["note"]
