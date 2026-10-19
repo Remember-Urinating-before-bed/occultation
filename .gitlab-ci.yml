@@ -62,9 +62,13 @@ quality:
     - uv run mypy src
     - uv run pytest --cov=occultation --cov-report=term-missing
 
-# External data is never fetched at runtime. This job only checks that the
-# committed snapshot still matches its recorded checksum and that the saved NAOJ
-# reference agrees with this project's solver. It mirrors the GitHub `data` job.
+# External data is never fetched at runtime. This job checks that the committed
+# snapshots still match their recorded checksums and that the saved NAOJ
+# references agree with this project's solver. It mirrors the GitHub `data` job.
+#
+# The JPL ephemeris is fetched, not committed (32 MB, reproducible), so it is
+# deliberately excluded from the checksum check here and exercises the
+# `skyfield` job below instead.
 data:
   stage: data
   image: ghcr.io/astral-sh/uv:0.12.7-python3.12-bookworm-slim
@@ -79,5 +83,33 @@ data:
     - uv --version
   script:
     - uv sync --locked --dev
-    - uv run python scripts/fetch_reference_data.py verify
-    - uv run python scripts/verify_reference_data.py
+    - uv run python scripts/fetch_reference_data.py verify --only naoj-jupiter-occultations-2019-2020
+    - uv run python scripts/fetch_reference_data.py verify --only naoj-saturn-occultations-2024-2025
+    - uv run python scripts/verify_reference_data.py --dataset jupiter
+    - uv run python scripts/verify_reference_data.py --dataset saturn
+
+# The independent-oracle stage. This is the job that catches a regression the
+# regression locks cannot: the fixture `expected` blocks are derived from the
+# solver itself, so only a second engine can disagree with it. Mirrors the GitHub
+# `skyfield` job. The ephemeris is downloaded and checksummed here rather than
+# committed; REQUIRE_EPHEMERIS makes the comparison test's "no ephemeris, skip"
+# a failure, so this job cannot pass by skipping its only real assertion.
+skyfield:
+  stage: data
+  image: ghcr.io/astral-sh/uv:0.12.7-python3.12-bookworm-slim
+  interruptible: true
+  cache:
+    key:
+      files:
+        - uv.lock
+    paths:
+      - .uv-cache/
+  variables:
+    REQUIRE_EPHEMERIS: "1"
+  before_script:
+    - uv --version
+  script:
+    - uv sync --locked --dev
+    - uv run python scripts/fetch_reference_data.py fetch --download --only jpl-de440s-planetary-ephemeris
+    - uv run pytest tests/reference_cases/test_skyfield_agreement.py -v
+    - uv run pytest --cov=occultation --cov-report=term-missing
