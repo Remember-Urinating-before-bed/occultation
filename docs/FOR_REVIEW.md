@@ -82,8 +82,10 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy src
 ```
 
 Command 1 currently prints `VERDICT: matches ...` and exits `0`. Command 4
-currently prints `45 passed`, `All checks passed!`, `28 files already
-formatted`, and `Success: no issues found in 13 source files`.
+currently prints `100 passed`, `All checks passed!`, `38 files already
+formatted`, and `Success: no issues found in 13 source files`. (Twenty of the
+tests need the ephemeris; without it the count is `80 passed, 20 skipped`, and
+that is the number a fresh clone sees.)
 
 ## 3. The actual output of `verify meeus-example-5`
 
@@ -527,12 +529,12 @@ $ uv run python scripts/verify_reference_data.py --dataset jupiter
                                                      -> 4 events, all agree with NAOJ
 $ uv run python scripts/verify_reference_data.py --dataset saturn
                                                      -> 4 events, all agree with NAOJ
-$ uv run pytest -q                                   -> 97 passed
+$ uv run pytest -q                                   -> 100 passed
 $ uv run ruff check .                                -> All checks passed!
 $ uv run ruff format --check .                       -> 38 files already formatted
 $ uv run mypy src                                    -> Success: no issues found in 13 source files
 $ uv run pytest --cov=occultation --cov-report=term-missing
-                                                     -> TOTAL 90%
+                                                     -> TOTAL 92%
 ```
 
 The tests that existed before this change still pass, unchanged in substance.
