@@ -30,7 +30,7 @@ Checked on 2026-03-09 in `/Users/workworkwork/Documents/repo/occultation`:
 | Dev dependencies | `mypy`, `pytest-cov`, `ruff` (pytest arrives transitively via `pytest-cov`) |
 | Git remote | `https://github.com/Remember-Urinating-before-bed/occultation.git` |
 | Branches | `main` (initial commit) and `develop` (HEAD, "Init python 3.12 project & gitlab ci" + 2 CI fixes) |
-| CI | GitHub Actions: `.github/workflows/ci.yml` (the primary pipeline) **and** GitLab CI: `.gitlab-ci.yml` (added 2026-09-23, one `quality` job, same gate). The old note that "there is no `gitlab-ci.yml`" is obsolete. |
+| CI | GitHub Actions: `.github/workflows/ci.yml` (the primary pipeline) **and** GitLab CI: `.gitlab-ci.yml` (added 2026-09-23). Both now run three jobs: `quality` (lint, format, types, tests), `data` (manifest checksums + the NAOJ cross-checks), and `skyfield` (fetch the ephemeris, then the custom-vs-Skyfield comparison; `REQUIRE_EPHEMERIS=1` makes that comparison fail rather than skip if the fetch did not work). |
 | Textbook PDF | `local/meeus_ocr/MeeusTables_Occultation.pdf` — git-ignored, image-only, 128 pages (see §8). Moved out of `src/occultation/` on 2026-03-09 (defect D8, fixed) |
 | `docs/` | Exists; `docs/AGENT_HANDOFF.md` (this file) and `docs/algorithms/meeus-star-local-circumstances.md` were added while closing milestone 0. It was empty before that |
 | Working tree | Milestone-0 work is present but **uncommitted**: repaired/re-typed files under `src/occultation/`, `tests/`, `docs/`, plus modified `AGENTS.md`, `pyproject.toml`, `config/locations/hong_kong.toml`, `src/occultation/__init__.py`, `tests/test_cli.py`. See Appendix B |
@@ -169,10 +169,28 @@ liquid core). Skyfield also notes ephemeris files never change once downloaded, 
 `load('de440s.bsp')` will not re-download if the file is already on disk — but the download
 directory must still be pinned explicitly and the fetch must be a separate, deliberate step.
 
-**No ephemeris file has been chosen or downloaded yet.** `data/manifest.json` is still
-`{"$schema_version": 1, "datasets": []}` and `data/external/` does not exist. Note also that
-the current Meeus occultation work (§8.4) does **not** need an ephemeris at all: Besselian
-elements are supplied as inputs from the printed tables.
+**Superseded 2026-10-20.** `de440s.bsp` *has* now been chosen, fetched and
+manifested, `data/manifest.json` is no longer empty, and `data/external/` exists.
+See §3.3.1 below. Note also that the Meeus occultation work (§8.4) does **not**
+need an ephemeris at all: Besselian elements are supplied as inputs from the
+printed tables. The ephemeris serves the *comparison*, not the custom solver.
+
+#### 3.3.1 The ephemeris, as it now stands (2026-10-20)
+
+- Chosen file: JPL `de440s.bsp` (1849-2150, 32 MB), recorded in
+  `data/manifest.json` as `jpl-de440s-planetary-ephemeris` with its URL,
+  coverage, size, retrieval date and SHA-256.
+- Fetched by a separate, deliberate step:
+  `uv run python scripts/fetch_reference_data.py fetch --download`. Never at
+  application runtime.
+- **Not committed.** 32 MB and reproducible from the recorded URL and checksum,
+  so `data/external/` is git-ignored (root `.gitignore`). The `skyfield` CI job
+  downloads and checksums it before running the comparison.
+- Read from an explicit local path,
+  `src/occultation/reference/skyfield_engine.py:DEFAULT_EPHEMERIS_PATH`. A
+  missing or corrupt file raises an error naming the path; nothing fetches.
+- `fetch_reference_data.py` gained `--only NAME` (so a job can fetch one
+  dataset) and a `urllib` fallback for images without `curl`.
 
 ### 3.4 Own calculation versus reference calculation
 
@@ -193,10 +211,19 @@ comparison layer
 The custom core must never import from `occultation.reference`. (The earlier wording said
 `hk_almanac.reference`; the package rename makes that import impossible anyway.)
 
-Today the boundary is only partially realised: `src/occultation/core/` (custom Meeus maths)
-and `src/occultation/domain/` exist, but there is **no `reference/` package yet** and nothing
-imports Skyfield. That is fine for the current work-package because the Meeus star-occultation
-method takes Besselian elements as *inputs* rather than computing them from an ephemeris.
+Today the boundary is realised. `src/occultation/core/` (custom Meeus maths) and
+`src/occultation/domain/` hold the custom core; `src/occultation/reference/`
+holds a working `SkyfieldEngine` that reads a local JPL kernel. The comparison
+layer is `tests/reference_cases/test_skyfield_agreement.py`, which runs both
+engines over every event of every fixture that declares `metadata.body`.
+
+One thing about the reference engine is a property of the data rather than an
+unfinished task, and it is worth stating once so nobody "fixes" it: a Meeus
+element set carries `To` as an abstract hour of Dynamical Time with **no calendar
+date**, so an element set cannot be turned back into an instant an ephemeris could
+be asked about. The reference engine therefore takes a body and an epoch
+(`--reference-body`, `--epoch-ut`), not an element set; its element-based entry
+point raises, with that reason, on purpose.
 
 ### 3.5 Scope discipline
 
@@ -469,7 +496,7 @@ Do not try to silence anything with `# noqa` or by loosening `pyproject.toml` �
 | D7 | `src/occultation/core/` and `src/occultation/domain/` have no `__init__.py` | `find src -name '__init__.py'` returns only the package root | Add them — `uv_build` may not ship the subpackages otherwise |
 | D8 | ~~The 128-page scanned PDF sits inside `src/occultation/`, i.e. inside the package `uv_build` packages~~ **FIXED 2026-03-09** | `uv build && unzip -l dist/*.whl` now lists 14 entries and **no PDF**; the file is at `local/meeus_ocr/MeeusTables_Occultation.pdf`, confirmed ignored by `git check-ignore -v` | Done — plain `mv` (the file was untracked). SHA-256 `c5d58affe71aabcf384b3ccf12d2c0e04297cab481742e7809e681fcba886d3c` if a copy must be identified |
 | D9 | `.coverage` (binary) is present in the worktree root although `.gitignore` lists it; all the Meeus files are untracked | `ls -la`, `git status --porcelain` | Decide what to commit (§15) |
-| D10 | `data/manifest.json` declares zero datasets, and neither `scripts/fetch_reference_data.py` nor `scripts/verify_reference_data.py` exists | `cat data/manifest.json` | Expected for this milestone; required before milestone 1 |
+| D10 | ~~`data/manifest.json` declares zero datasets, and neither `scripts/fetch_reference_data.py` nor `scripts/verify_reference_data.py` exists~~ **FIXED 2026-10-20** | `uv run python scripts/fetch_reference_data.py verify` reports three datasets ok; the manifest records the JPL ephemeris and both NAOJ snapshots | Done. See §3.3.1. `data/external/` is git-ignored; the ephemeris is fetched by the deliberate command |
 | D11 | Cosmetic but user-visible typos in tracked files: `pyproject.toml` says `description = "A playground astronomical occulation program for HK"` ("occulation"), and `config/locations/hong_kong.toml` has the three problems listed in §6 | `cat pyproject.toml`, `cat config/locations/hong_kong.toml` | Fix in the same small PR as D1, since both touch tracked scaffold files |
 | D12 | ~~`AGENTS.md` (tracked) instructs every agent to "Read handoff.md file completely before modifying this repository", but **no `handoff.md` exists at the repository root**~~ **PART-FIXED 2026-03-09**: `AGENTS.md` now names `local/README_AI_HANDOFF.md` and warns that `local/` is git-ignored. The remaining half of the defect is that the target is still ignored, so a fresh clone or CI-run agent following `AGENTS.md` finds nothing | `git diff AGENTS.md`; `git check-ignore -v local/README_AI_HANDOFF.md` | Finish by open decision 5 in §15: copy this handoff to a tracked path (e.g. `docs/AGENT_HANDOFF.md`) and repoint `AGENTS.md` at it. The `AGENTS.md` edit is uncommitted — commit it with the milestone 0 PR |
 
@@ -779,8 +806,13 @@ done for milestone 0.
 
 ### Milestone 1 — Working Skyfield reference result
 
-Status: **not started.** Requires an ephemeris (`data/manifest.json` is still empty) and the
-`reference/` package, neither of which exists.
+Status: **partly done (2026-10-20).** The ephemeris, the manifest entry, the
+separate fetch command and `SkyfieldEngine` loading a local BSP file *without
+downloading* all exist, and the engine answers lunar-occultation geometry for a
+body at an epoch (see §3.3.1 and §3.4). What remains of milestone 1 is the
+milestone's own subject: a **Sun position** command (`occultation sun-position`)
+with its JSON metadata. The occultation work pulled the engine forward ahead of
+the Sun, which is fine — the engine's Skyfield loading is the shared part.
 
 Learn:
 
@@ -1249,6 +1281,13 @@ Use five levels of evidence:
 - **Unit tests:** textbook examples and isolated mathematical functions.
 - **Property tests:** round trips, invariants, angle ranges, and event ordering.
 - **Differential tests:** custom engine versus Skyfield with identical inputs.
+  **Realised 2026-10-20** in `tests/reference_cases/test_skyfield_agreement.py`,
+  which covers every event of every fixture that declares `metadata.body` and
+  checks the instant, the separation, the position angle, the altitude and the
+  visibility verdict. Its bounds are documented next to the measurement that set
+  them. Note the honest limit: the two engines define the Moon's radius
+  differently, so the separation bound is 0.003 Moon radii, not zero — see the
+  module docstring of `src/occultation/reference/skyfield_engine.py`.
 - **Product tests:** final Hong Kong output versus HKO, and later versus Occult.
 - **Transcription tests:** for the Meeus work specifically — a fixture value is admissible only
   after it has been read off the printed page by eye, and the fixture records both the printed page
@@ -1410,8 +1449,8 @@ repository is inspected" are now answered:
 | Which files are committed? | Only the scaffold: `.gitignore`, `.python-version`, `README.md`, `AGENTS.md`, `dataflow.mmd`, `pyproject.toml`, `uv.lock`, `.github/workflows/ci.yml`, `config/locations/hong_kong.toml`, `data/README.md`, `data/manifest.json`, `src/occultation/__init__.py`, `src/occultation/cli.py`, `tests/test_cli.py` |
 | Is a runner/pipeline configured? | Yes — GitHub Actions `.github/workflows/ci.yml`, single `quality` job, triggers `push` to `main`/`develop` plus `pull_request`: checkout@v7 → `astral-sh/setup-uv@v9.0.0` (pinned uv `0.12.7`, cache on) → `uv python install` → `uv sync --locked --dev` → `uv run python --version` → `ruff check .` → `ruff format --check .` → `mypy src` → `pytest --cov=occultation --cov-report=term-missing`. **Not GitLab.** CI is therefore red today. |
 | Is the textbook PDF in the repository? | No — it was moved to `local/meeus_ocr/MeeusTables_Occultation.pdf` on 2026-03-09, which is git-ignored (defect D8 closed, §8.2) |
-| Which ephemeris has been selected? | None. `data/manifest.json` has zero datasets; `data/external/` does not exist |
-| Has reference data been downloaded? | No |
+| Which ephemeris has been selected? | JPL `de440s.bsp`, recorded in `data/manifest.json` and fetched by `scripts/fetch_reference_data.py` (2026-10-20; see §3.3.1) |
+| Has reference data been downloaded? | Yes — deliberately, with checksum verification, into the git-ignored `data/external/`. Never at application runtime |
 
 Untracked work in the tree — all seven files OCR-derived, all currently non-functional:
 
@@ -1484,6 +1523,16 @@ The roadmap in §9 is the long-term plan. The next increments, in order:
 > to the star path. The next increment is a Hong Kong visibility sweep over the eight planets
 > (Jupiter first), which needs one hand-transcribed Table III row per event cross-checked against
 > NAOJ. Items 3-6 below still stand.
+>
+> **Status 2026-10-20: the ephemeris prerequisite of item 3 is DONE and the reference engine
+> exists.** `de440s.bsp` is chosen, manifested and fetched by a separate command; `SkyfieldEngine`
+> loads it from an explicit local path and answers lunar-occultation geometry for a body at an
+> epoch (`--engine skyfield`, `--engine compare`, needs `--reference-body` and `--epoch-ut`); and
+> `tests/reference_cases/test_skyfield_agreement.py` is the project's first genuinely independent
+> oracle — it runs both engines over the eight events of the Jupiter and Saturn fixtures and
+> requires agreement (worst measured: 0.00199 Moon radii, 16.5 s). A CI job fetches the ephemeris
+> and sets `REQUIRE_EPHEMERIS=1` so the comparison cannot skip. **What is left of item 3 is the
+> Sun-position command itself** (`occultation sun-position`), then milestone 2's HKO comparison.
 
 1. **Make the quality gate green** (milestone 0, §7.2): fix D1 (entry point), D2 (`hk_almanac` →
    `occultation` imports), D3/D5 (re-type the broken modules and tests), D4 (valid TOML fixture),

@@ -407,50 +407,56 @@ job as a genuine check. Code `3` exists so that a request for the reference
 engine fails honestly instead of quietly returning the custom engine's number
 under a reference label.
 
-## 8. The reference engine is deliberately empty
+## 8. The reference engine, and what the comparison actually shows
 
-`src/occultation/reference/skyfield_engine.py` does not calculate anything. It
-raises:
+`src/occultation/reference/skyfield_engine.py` now calculates. It reads a local
+JPL DE440s kernel and finds the least apparent separation of a body from the
+Moon for an observer, using Skyfield — no elements, no Besselian polynomials, and
+no code shared with `occultation.core`.
 
-> the Skyfield reference engine is not implemented yet: milestone 1 needs a
-> local JPL ephemeris (`data/manifest.json` currently declares zero datasets)
-
-There is a reason to add a file that does nothing. The project's plan is to
-have two independent engines — this repository's own textbook maths (the
-"custom core") and a trusted third-party calculation (Skyfield with a local JPL
-ephemeris, the "reference engine") — and to compare them. The rule that keeps
-that honest is that the custom core must never import the reference package. By
-creating the reference package now with a placeholder that refuses to answer,
-the command line can already offer `--engine skyfield` and `--engine compare`,
-the failure mode is visible and tested, and no future contributor can
-accidentally wire the custom engine to the reference engine to make a number
-appear.
-
-Concretely:
+It cannot be handed a Meeus element set, and that is a property of Meeus's data
+rather than an unfinished task. `To` is an abstract hour of Dynamical Time with
+no calendar date attached, so an element set cannot be turned back into an
+instant an ephemeris could be asked about. The reference engine takes the body
+and the epoch instead:
 
 ```bash
-# Fails with exit code 3 and an explanation. Does not print a result.
-uv run occultation local-circumstances --engine skyfield ...
+# The reference answer on its own, clearly labelled. No elements needed at all.
+uv run occultation local-circumstances \
+  --location config/locations/hong_kong.toml --delta-t-seconds 69 \
+  --engine skyfield --reference-body saturn --epoch-ut 2024-12-08T08:58:51Z
 
-# Prints the custom result, plus a comparison block that says the reference
-# engine is unavailable and why. Exit code 0.
-uv run occultation local-circumstances --engine compare ...
+# Both engines, and the difference between them.
+uv run occultation local-circumstances \
+  --elements tests/fixtures/meeus_saturn_2024_2025.json \
+  --location config/locations/hong_kong.toml --delta-t-seconds 69 \
+  --engine compare --reference-body saturn --epoch-ut 2024-12-08T08:58:51Z
 ```
 
-The `compare` output contains:
+`--engine skyfield` without `--reference-body` still exits 3 with an explanation,
+because there is genuinely nothing to hand the engine. Called from the CLI the
+reference result is labelled `engine: skyfield` and carries no `result` key, so a
+machine reader cannot mistake it for this repository's own answer.
 
-```json
-"comparison": {
-  "reference_engine": "skyfield",
-  "status": "unavailable",
-  "reason": "the Skyfield reference engine is not implemented yet: ...",
-  "note": "no difference is reported because the reference engine has not been implemented; the custom result above stands on its own"
-}
+The two engines use different definitions of the Moon's radius — Meeus's `k` is a
+fixed ratio to the Earth's equatorial radius, Skyfield's is the true radius at the
+true distance — so they differ at roughly the 0.1% level by construction. The
+comparison tolerance is quoted in thousandths of a Moon radius on that basis, not
+in the last printed digit.
+
+Over the eight events of the Jupiter and Saturn fixtures the two engines agree to:
+
+```text
+quantity                     worst             bound in the test
+|Delta| difference            0.00199 radii     0.003
+closest-approach time        16.5 s            36 s
+position angle               0.25 deg          0.5 deg
+Moon altitude                1.18 deg          1.5 deg
 ```
 
-That is the honest version of a comparison report. A comparison block that
-reported a difference of zero because both sides were the same code would be
-worse than no comparison block at all.
+The larger time and altitude differences are for the events that miss the Moon by
+several radii, where the separation curve is shallow and a small geometry
+difference moves the minimum a long way.
 
 ## 9. What the JSON output looks like
 
@@ -505,15 +511,25 @@ $ uv run occultation verify meeus-example-5 --format json
 $ uv run occultation local-circumstances --elements ... --location ... --delta-t-seconds 65
                                                      -> exit 0, 4 iterations
 $ uv run occultation local-circumstances ... --engine compare
-                                                     -> exit 0, comparison: unavailable
+                                                     -> exit 0, comparison: not_compared
 $ uv run occultation local-circumstances ... --engine skyfield
                                                      -> exit 3, no result printed
 $ uv run occultation local-circumstances --elements ...meeus_mars_1997.json \
     --location ... --delta-t-seconds 72 --body planet
                                                      -> exit 0, planet + contacts
-$ uv run pytest -q                                   -> 45 passed
+$ uv run occultation local-circumstances --engine skyfield \
+    --reference-body saturn --epoch-ut 2024-12-08T08:58:51Z \
+    --location config/locations/hong_kong.toml --delta-t-seconds 69
+                                                     -> exit 0, reference answer, labelled
+$ uv run python scripts/fetch_reference_data.py verify
+                                                     -> 3 datasets ok
+$ uv run python scripts/verify_reference_data.py --dataset jupiter
+                                                     -> 4 events, all agree with NAOJ
+$ uv run python scripts/verify_reference_data.py --dataset saturn
+                                                     -> 4 events, all agree with NAOJ
+$ uv run pytest -q                                   -> 97 passed
 $ uv run ruff check .                                -> All checks passed!
-$ uv run ruff format --check .                       -> 28 files already formatted
+$ uv run ruff format --check .                       -> 38 files already formatted
 $ uv run mypy src                                    -> Success: no issues found in 13 source files
 $ uv run pytest --cov=occultation --cov-report=term-missing
                                                      -> TOTAL 90%
@@ -526,9 +542,11 @@ itself a test, so a transcription slip in either file fails the suite.
 
 ## 11. What is *not* done (so nobody is misled)
 
-- **No reference engine.** Skyfield is declared as a dependency but is not
-  imported anywhere, and `data/manifest.json` still lists zero datasets. There
-  is no ephemeris file in the repository. Milestone 1 is where that changes.
+- **The reference engine does not generate the elements.** It can check a body's
+  occultation for an observer directly from the ephemeris, but it cannot produce
+  the Besselian elements the custom solver consumes. That is a different (and
+  larger) piece of work: it means computing the Moon's shadow geometry and
+  fitting the polynomials, not just evaluating two positions.
 - **The elements are still supplied, not calculated.** This code does not yet
   compute the Moon's Besselian elements from an ephemeris; it starts from
   elements someone else produced. That is the whole point of the current
@@ -538,12 +556,12 @@ itself a test, so a transcription slip in either file fails the suite.
 - **The numbers are not observation-grade.** They reproduce a textbook example
   to the precision the textbook prints. Nothing here has been compared with
   real observations or with the Hong Kong Observatory's published almanac.
-- **No Hong Kong visibility sweep over the planets yet.** The planet branch and
-  `is_visible` are proved against Meeus Example 3 (Uccle), but there is no
-  fixture per planet for a Hong Kong observer. That needs one hand-transcribed
-  Table III row per event, cross-checked **by hand** against NAOJ, and is the
-  next increment (Jupiter first). See §13.10 for why the NAOJ check is a manual
-  step and not a script.
+- **No Hong Kong visibility sweep over the planets yet.** Two multi-event
+  fixtures exist and are cross-checked against NAOJ (Jupiter at Uccle, Saturn at
+  Tokyo), but there is still no fixture per planet for a *Hong Kong* observer
+  that a Hong Kong observer could actually see, which needs one hand-transcribed
+  Table III row per event and a NAOJ check. See §13.10 for why the NAOJ check is
+  a manual step and not a script.
 - **The packaged wheel does not contain the fixture.** `uv build` produces a
   wheel containing only the `occultation` package (checked with `unzip -l`), so
   `occultation verify meeus-example-5` works from a source checkout, where the
@@ -553,8 +571,11 @@ itself a test, so a transcription slip in either file fails the suite.
   correct for this repository and wrong for an installed distribution. Fixing
   it properly means packaging the fixture as package data, which changes the
   build configuration and therefore deserves its own change.
-- **`data/manifest.json` is still empty** (open defect D10 in the handoff), and
-  `.coverage` still sits in the working tree (open defect D9).
+- **The ephemeris is not committed.** It is 32 MB and reproducible from the URL
+  and checksum in `data/manifest.json`, so `data/external/` is git-ignored and
+  the `skyfield` CI job fetches it. A checkout without it still passes the whole
+  suite, with the agreement test skipping — which is why CI sets
+  `REQUIRE_EPHEMERIS=1` to turn that skip into a failure.
 
 ## 12. Questions worth asking
 
@@ -567,17 +588,25 @@ itself a test, so a transcription slip in either file fails the suite.
    is what the existing regression test reads and is not worth churning. The
    JSON one is the canonical on-disk format for the new command line. A test
    asserts they agree, so the duplication is checked rather than trusted.
-3. **Why does `--engine compare` exit 0 when the reference engine is
-   missing?** Because the custom result is real and complete; only the
-   comparison is missing, and the output says so explicitly. `--engine
-   skyfield` is the mode that must fail, and it exits 3.
+3. **Why does `--engine compare` exit 0 when there is no body and epoch?** Because
+   the custom result is real and complete; only the comparison is missing, and
+   the output says so explicitly (`status: "not_compared"`). With
+   `--reference-body` and `--epoch-ut` it reports a real difference instead. The
+   mode that must fail is `--engine skyfield` with no body, and it exits 3.
 4. **Why four iterations when the book says two or three?** §4.3: the book's
    remark assumes a good hand-computed first guess, while this code starts from
    the prescribed `t = 0`. The count is asserted by the regression test, so the
    starting guess and the tolerance cannot drift unnoticed.
-5. **What would you change first?** Two candidates, in order: package the
-   fixture so the wheel is self-contained, and then start milestone 1 so the
-   comparison block can carry a real difference.
+5. **Why is the comparison tolerance so loose (0.003 Moon radii)?** Because the
+   two engines define the Moon's radius differently — a fixed `k` against the
+   true radius at the true distance — so a difference of that order is expected
+   by construction, not an error budget. The measured worst case is 0.00199, and
+   the bound is stated next to the measurement so that loosening it is a visible
+   decision. The time, angle and altitude bounds are set the same way.
+6. **What would you change first?** Two candidates, in order: package the
+   fixture so the wheel is self-contained, and then teach the project to derive
+   its own Besselian elements from the ephemeris, which is Stage E of
+   [`occultation-data-plan.md`](occultation-data-plan.md).
 
 ## 13. Reflector review (experienced software and data engineer, 2026-10-06)
 
