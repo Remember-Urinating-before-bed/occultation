@@ -10,7 +10,9 @@
       "separation_in_moon_radii": 1e-06,
       "position_angle_deg": 0.01,
       "altitude_deg": 0.01
-    }
+    },
+    "body": "Jupiter",
+    "event_keys_are": "universal-time dates (the calendar date of To - Delta T in UT)"
   },
   "observer": {
     "longitude_deg_east": -2.3372,
@@ -33,12 +35,12 @@
         "moon_shadow_x": {
           "at_reference": 0.092336,
           "linear_rate_per_hour": 0.571548,
-          "quadratic_term_per_hour_squared": -0.000024
+          "quadratic_term_per_hour_squared": -2.4e-05
         },
         "moon_shadow_y": {
           "at_reference": 0.749714,
           "linear_rate_per_hour": -0.055842,
-          "quadratic_term_per_hour_squared": 0.000003
+          "quadratic_term_per_hour_squared": 3e-06
         }
       },
       "expected": {
@@ -74,12 +76,12 @@
         "moon_shadow_x": {
           "at_reference": 0.273307,
           "linear_rate_per_hour": 0.568795,
-          "quadratic_term_per_hour_squared": -0.000015
+          "quadratic_term_per_hour_squared": -1.5e-05
         },
         "moon_shadow_y": {
           "at_reference": 0.17645,
           "linear_rate_per_hour": -0.03015,
-          "quadratic_term_per_hour_squared": 0.000032
+          "quadratic_term_per_hour_squared": 3.2e-05
         }
       },
       "expected": {
@@ -103,12 +105,12 @@
         "moon_shadow_x": {
           "at_reference": 0.165739,
           "linear_rate_per_hour": 0.562303,
-          "quadratic_term_per_hour_squared": 0.000007
+          "quadratic_term_per_hour_squared": 7e-06
         },
         "moon_shadow_y": {
           "at_reference": -0.38284,
           "linear_rate_per_hour": -0.002948,
-          "quadratic_term_per_hour_squared": 0.000056
+          "quadratic_term_per_hour_squared": 5.6e-05
         }
       },
       "expected": {
@@ -132,12 +134,12 @@
         "moon_shadow_x": {
           "at_reference": 0.214422,
           "linear_rate_per_hour": 0.555796,
-          "quadratic_term_per_hour_squared": 0.000012
+          "quadratic_term_per_hour_squared": 1.2e-05
         },
         "moon_shadow_y": {
           "at_reference": -0.990496,
           "linear_rate_per_hour": 0.022575,
-          "quadratic_term_per_hour_squared": 0.000078
+          "quadratic_term_per_hour_squared": 7.8e-05
         }
       },
       "expected": {

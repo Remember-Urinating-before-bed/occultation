@@ -220,3 +220,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Large external datasets. data/validation/ holds small human-saved snapshots and
+# is committed; data/external/ holds anything fetched from a URL, which is
+# reproducible from the URL and checksum recorded in data/manifest.json and so is
+# deliberately not committed. The CI `data` and `skyfield` jobs fetch it.
+#   de440s.bsp is 32 MB; committing it would bloat every clone and every diff.
+data/external/
+local/

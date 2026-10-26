@@ -2,6 +2,19 @@
     "$schema_version": 1,
     "datasets": [
         {
+            "name": "jpl-de440s-planetary-ephemeris",
+            "path": "data/external/de440s.bsp",
+            "kind": "url",
+            "source": "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp",
+            "source_description": "JPL Solar System Dynamics DE440s planetary and lunar ephemeris, SPICE binary kernel. The 's' variant is the DE440 integration truncated to 1849-2150 and to the planets, Sun, Moon and barycentres, which is the recommended file for pointing-type work over the modern era.",
+            "version": "DE440s (JPL, released 2020-12-22)",
+            "coverage": "1849-12-26/2150-01-22",
+            "size_bytes": 32726016,
+            "retrieved": "2026-10-20",
+            "sha256": "c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2",
+            "notes": "The independent oracle for tests/reference_cases/test_skyfield_agreement.py, which compares the custom Besselian solver against Skyfield reading this file. Fetched deliberately, never at application runtime: `uv run python scripts/fetch_reference_data.py fetch --download`. The CI `skyfield` job downloads it and then runs the comparison with REQUIRE_EPHEMERIS=1, which turns the comparison test's skip into a failure. NOTE: unlike the NAOJ snapshots this file is NOT committed to the repository - it is a 32 MB binary and it is reproducible from the recorded URL and checksum, so it lives in data/external/ (git-ignored) and is re-fetched by the job that needs it."
+        },
+        {
             "name": "naoj-jupiter-occultations-2019-2020",
             "path": "data/validation/naoj/naoj_jupiter_2019_2020.json",
             "kind": "reference-validation",
@@ -12,6 +25,18 @@
             "retrieved": "2026-06-10",
             "sha256": "b44de9fff8fb502ae37b4c2678feca3f11e04889b8104913e7e60c701ab29f29",
             "notes": "Human-saved result pages, transcribed into a small JSON document. NAOJ renders contact times as a .gif image, so only the machine-readable status text ('Not Visible' / a visible status) is captured; OCR of the image is forbidden. The document is the independent oracle for the Jupiter regression lock in tests/reference_cases/test_meeus_jupiter.py, whose expected values are derived from this repository's own solver and are NOT printed in Meeus."
+        },
+        {
+            "name": "naoj-saturn-occultations-2024-2025",
+            "path": "data/validation/naoj/naoj_saturn_2024_2025.json",
+            "kind": "reference-validation",
+            "source": "https://eco.mtk.nao.ac.jp/cgi-bin/koyomi/cande/c_occulx_p_en.cgi",
+            "source_description": "NAOJ (National Astronomical Observatory of Japan) lunar-occultation Local Prediction form; the four Saturn events of 2024 November 11 to 2025 February 01, for Tokyo (a NAOJ Major City).",
+            "version": "saved-page snapshot",
+            "coverage": "2024-11-11/2025-02-01",
+            "retrieved": "2026-10-20",
+            "sha256": "a30de67007071b10c9d2f852b09dbf4cc6432dc962840e4aaf634e04a71333d7",
+            "notes": "Saved NAOJ Local Prediction pages for Tokyo (Lat 35.6581, Lon 139.7414, Hgt 0.0 m, UT+9, Delta T = 69 s). Unlike the Jupiter snapshot, a visible event returns a text table, so the 2024-12-08 contacts are captured as machine-readable times; the map figure is never OCR'd. This snapshot is the independent oracle for tests/reference_cases/test_meeus_saturn.py, whose expected block is otherwise derived from this repository's own solver. Dates are NAOJ's own, which are JCST (UT+9); if a fixture keys an event by its UT date instead, change the fixtures and this snapshot together. Reached with scripts/verify_reference_data.py --dataset saturn."
         }
     ]
 }

@@ -67,14 +67,22 @@ occultation/
 │   └── hong_kong.toml            # HK site, east-positive longitude, WGS84
 ├── data/
 │   ├── README.md                 # external-data policy (no silent downloads)
-│   └── manifest.json             # currently zero datasets
+│   ├── manifest.json             # 3 datasets: the JPL ephemeris + 2 NAOJ snapshots
+│   ├── external/                 # GIT-IGNORED: fetched files, e.g. de440s.bsp
+│   └── validation/naoj/          # committed NAOJ snapshots (the independent oracles)
 ├── docs/
-│   ├── AGENT_HANDOFF.md          # authoritative engineering handoff (1600+ lines)
+│   ├── AGENT_HANDOFF.md          # authoritative engineering handoff (1700+ lines)
 │   ├── FOR_REVIEW.md             # short review note: what the CLI does, and the proof
+│   ├── ELI5-code-explained.html  # Part 0: the whole code base, explained without jargon
 │   ├── explainer.html            # Part 1: the topic, for beginners
 │   ├── CODEBASE.md               # Part 2: this file
 │   └── algorithms/
-│       └── meeus-star-local-circumstances.md
+│       ├── meeus-star-local-circumstances.md
+│       └── meeus-planet-local-circumstances.md
+├── scripts/
+│   ├── fetch_reference_data.py   # the deliberate download / checksum step
+│   ├── verify_reference_data.py  # NAOJ snapshot vs this solver, per event
+│   └── sync_fixture_twins.py     # JSON ↔ TOML fixture twins
 ├── src/occultation/
 │   ├── __init__.py               # docstring only; no logic
 │   ├── cli.py                    # local-circumstances + verify subcommands
@@ -82,7 +90,7 @@ occultation/
 │   │   ├── elements_file.py      # JSON elements document → StarOccultationElements
 │   │   └── location_file.py      # .json/.toml site → ObserverLocation
 │   ├── reference/                # may import core; core may never import this
-│   │   └── skyfield_engine.py    # placeholder that raises, not a calculation
+│   │   └── skyfield_engine.py    # the Skyfield engine: JPL kernel in, geometry out
 │   ├── domain/                   # pure data + validation, no maths
 │   │   ├── observer.py           # ObserverLocation
 │   │   └── occultation.py        # FundamentalPlanePolynomial, StarOccultationElements,
@@ -92,18 +100,29 @@ occultation/
 │       ├── observer_coordinates.py   # geographical → geocentric observer
 │       └── local_circumstances.py    # the iterative closest-approach solver
 └── tests/
-    ├── test_cli.py               # subcommands, exit codes, JSON shape
+    ├── test_cli.py               # subcommands, exit codes, JSON shape, engine modes
     ├── unit/test_observer_coordinates.py
     ├── unit/test_elements_file.py
     ├── unit/test_location_file.py
     ├── unit/test_reference_engine.py
+    ├── unit/test_sync_fixture_twins.py
     ├── reference_cases/test_meeus_regulus.py   # the star regression
     ├── reference_cases/test_meeus_mars.py      # the planet regression
+    ├── reference_cases/test_meeus_jupiter.py   # 4 Table III rows, Uccle
+    ├── reference_cases/test_meeus_saturn.py    # 4 Table III rows, Tokyo
+    ├── reference_cases/test_meeus_mars_venus.py  # 6 rows, Hong Kong (all miss)
+    ├── reference_cases/test_skyfield_agreement.py  # the INDEPENDENT oracle
     └── fixtures/
         ├── meeus_regulus_1999.toml   # Example 5 inputs and expected values
         ├── meeus_regulus_1999.json   # the same, for the CLI; a test asserts equality
         ├── meeus_mars_1997.toml      # Example 3, the planet branch
-        └── meeus_mars_1997.json      # the same, for the CLI
+        ├── meeus_mars_1997.json      # the same, for the CLI
+        └── meeus_{jupiter_2019_2020,saturn_2024_2025}.{toml,json}
+                                      # Table III rows; expected DERIVED from this
+                                      # solver, oracle = the NAOJ snapshots
+            meeus_{mars_2031_2032,venus_2027_2028}.{toml,json}
+                                      # hand transcription from another edition;
+                                      # oracle = the Skyfield comparison only
 ```
 
 `local/` also exists but is **git-ignored** (`local/.gitignore` contains `*`). It
@@ -162,8 +181,8 @@ Private helpers, each one formula: `_relative_motion_at`, `_local_hour_angle_deg
 ### `src/occultation/cli.py`
 
 Two subcommands, and no astronomy in the file at all: it parses arguments, hands
-them to `io/` to become domain values, calls the custom core (or the reference
-placeholder), and formats the answer.
+them to `io/` to become domain values, calls the custom core or the reference
+engine, and formats the answer.
 
 ```bash
 uv run occultation local-circumstances \
@@ -176,11 +195,16 @@ uv run occultation verify meeus-example-5
 `local-circumstances` accepts either a file or the equivalent inline options for
 both the elements and the observer. It refuses to mix the two, and
 `--delta-t-seconds` is required because ΔT is never guessed. `--format json`
-emits `{engine, algorithm, inputs, derived, result[, comparison]}`; `--engine
-skyfield` exits `3`; `--engine compare` adds the comparison block. `verify`
-re-runs a published example from the fixture the regression test also reads and
-exits `1` on a mismatch. Exit codes: `0` success, `1` mismatch, `2` bad
-usage/input, `3` reference engine unavailable.
+emits `{engine, algorithm, inputs, derived, result[, comparison]}`.
+`--engine skyfield` runs only the reference engine and prints a document labelled
+`engine: skyfield` with a `reference` key and **no** `result` key, so a machine
+reader cannot mistake it for this repository's own answer; it needs
+`--reference-body` and `--epoch-ut`, and without them it exits `3` with the
+reason. `--engine compare` runs both and adds a `comparison` block that is either
+`compared` (both answers and their difference) or `not_compared` (with the
+reason). `verify` re-runs a published example from the fixture the regression test
+also reads and exits `1` on a mismatch. Exit codes: `0` success, `1` mismatch, `2`
+bad usage/input, `3` the reference engine could not be used.
 
 ### `src/occultation/io/`
 
@@ -192,29 +216,75 @@ import `occultation.reference`.
 
 ### `src/occultation/reference/`
 
-`skyfield_engine.py` exists so the command line can offer `--engine skyfield`
-and `--engine compare` with a stable interface. It raises
-`ReferenceEngineUnavailable` rather than returning a number; milestone 1
-replaces the body with a real Skyfield calculation against a local ephemeris.
+`skyfield_engine.py` is a working Skyfield engine. It loads a local JPL SPICE
+kernel (never downloading one) and finds the least apparent separation of a body
+from the Moon for an observer, returning a `BodyCircumstances`. It answers a
+slightly different question from the custom core, and the difference is real:
+
+- Meeus's `k` is the Moon's radius as a *fixed ratio* to the Earth's equatorial
+  radius; the engine uses the Moon's true mean radius (1737.4 km) at the Moon's
+  actual distance. The two conventions differ at roughly the 0.1% level, which is
+  why the comparison test's tolerance is quoted in thousandths of a Moon radius.
+- The custom solver iterates on Besselian polynomials; the engine minimises the
+  apparent separation of two Skyfield positions directly.
+
+Two design rules are load-bearing. Skyfield is imported lazily, so the custom
+engine works with no reference dependencies installed. And the ephemeris is read
+from an explicit local path — a missing or corrupt file is an error naming the
+path, never a fetch.
+
+There is no element-based entry point, and that is a property of Meeus's data
+rather than an unfinished task: `To` is an abstract hour of Dynamical Time with
+no calendar date attached, so an element set cannot be handed to an ephemeris.
+The engine takes a body and an epoch instead — `--reference-body` and
+`--epoch-ut` on the command line.
 
 ### `tests/`
 
 - `test_cli.py` — program name, the declared console-script target is
   `occultation.cli:main`, `--help` prints real usage, `--version` prints `0.1.0`,
   plus the subcommands: exit codes, both input styles, JSON shape, the mismatch
-  path, and the missing-file and malformed-JSON messages.
+  path, the missing-file and malformed-JSON messages, and the three engine modes
+  (`custom`, `skyfield`, `compare`).
 - `unit/test_observer_coordinates.py` — Palomar geocentric values from the book,
   southern-hemisphere signs, latitude validation.
 - `unit/test_elements_file.py` — the elements loader, including that the JSON
   fixture and the TOML fixture agree field by field.
 - `unit/test_location_file.py` — the site loader, JSON and TOML paths.
-- `unit/test_reference_engine.py` — the placeholder refuses to answer, and
-  importing `occultation.reference` does not import Skyfield.
+- `unit/test_reference_engine.py` — the engine's seam: importing the package does
+  not import Skyfield (checked in a subprocess, so the result does not depend on
+  test ordering), a missing or corrupt ephemeris names the path, an unknown body
+  is refused, and the element-based entry point refuses rather than inventing a
+  number.
+- `unit/test_sync_fixture_twins.py` — the JSON/TOML twin writer.
 - `reference_cases/test_meeus_regulus.py` + `tests/fixtures/meeus_regulus_1999.toml`
   — the regression that pins the whole calculation to Meeus Example 5.
 - `reference_cases/test_meeus_mars.py` + `tests/fixtures/meeus_mars_1997.toml`
   — the planet branch: non-zero `D1` and `F`, the cone-shaped shadow, and both
   contacts, pinned to Meeus Example 3 (Mars, 1997 November 12, Uccle).
+- `reference_cases/test_meeus_jupiter.py` + `tests/fixtures/meeus_jupiter_2019_2020.{toml,json}`
+  — four Jupiter rows of Table III at Uccle. The `expected` block is derived from
+  this solver (a regression lock); the independent oracle is the saved NAOJ
+  snapshot.
+- `reference_cases/test_meeus_saturn.py` + `tests/fixtures/meeus_saturn_2024_2025.{toml,json}`
+  — the same shape for four Saturn events at Tokyo, cross-checked against NAOJ
+  by `scripts/verify_reference_data.py --dataset saturn`.
+- `reference_cases/test_meeus_mars_venus.py` +
+  `tests/fixtures/meeus_{mars_2031_2032,venus_2027_2028}.{toml,json}` — six rows
+  transcribed by the project owner from a different edition of the book, at Hong
+  Kong. Their headers are the important part: `To` was reconstructed by fitting
+  the transcription against the ephemeris, and two transcriptions were corrected
+  (a flipped `Y1`/`Y2` pair and an `H0`/`H1` swap). All six events miss the Moon
+  from Hong Kong, so these rows test the plumbing and the agreement, not a
+  prediction.
+- `reference_cases/test_skyfield_agreement.py` — **the independent-oracle test.**
+  Runs the custom solver and Skyfield over every event of every fixture that
+  declares `metadata.body` — discovered, so a new fixture cannot be left out —
+  and requires them to agree on the instant, the separation, the position angle,
+  the altitude, and the visibility verdict. This is the only test in the suite
+  whose oracle is not either the book or this solver itself. It skips when the
+  ephemeris is absent, and CI sets `REQUIRE_EPHEMERIS=1` to turn that skip into a
+  failure.
 
 
 ## 5. The regression that proves it works
@@ -285,8 +355,8 @@ uv run ruff format --check .    # formatting
 uv run mypy src                 # type check
 ```
 
-All of the above are green as of the verification date. Two pipelines run exactly
-this set:
+All of the above are green as of the verification date. Two pipelines run the
+same three jobs:
 
 - `.github/workflows/ci.yml` — on pushes to `main`/`develop` and on every pull
   request.
@@ -294,6 +364,12 @@ this set:
   `workflow:rules` block that guarantees **one** pipeline per change: a branch
   with an open merge request gets the merge-request pipeline and its branch
   pipeline is suppressed.
+
+The three jobs are `quality` (the gate above), `data` (manifest checksums plus
+the two NAOJ cross-checks) and `skyfield` (fetch the JPL ephemeris, checksum it,
+then run the custom-vs-Skyfield comparison with `REQUIRE_EPHEMERIS=1` so the
+comparison cannot go green by skipping). `skyfield` is the only job that needs
+the network, and it needs it before the tests run, never during.
 
 ## 7. Conventions you must follow
 
@@ -318,16 +394,20 @@ this set:
 
 ## 8. What is not implemented yet
 
-- The reference engine's actual calculation (Skyfield + local JPL ephemeris) and
-  therefore any real comparison difference. The package and the CLI seam exist;
-  the engine raises.
-- Generation of the Besselian elements — they are inputs today.
-- A Hong Kong visibility sweep over the eight planets. The planet branch and the
-  `is_visible` flag exist and are tested against Meeus Example 3, but a fixture
-  per planet (Jupiter first) that a Hong Kong observer could actually see is
-  still to be transcribed and cross-checked **by hand** against NAOJ. The NAOJ
-  service is an interactive form that returns a rendered figure, not a data
-  table, so this check cannot be scripted; see `docs/FOR_REVIEW.md` §13.10.
+- Deriving the Besselian elements. The reference engine can check a body's
+  occultation directly from the ephemeris, but it cannot *produce* the elements
+  the custom solver consumes — that means computing the Moon's shadow geometry
+  and fitting the polynomials. The elements are inputs today.
+- A Hong Kong visibility sweep over the eight planets. Four multi-event fixtures
+  exist and are cross-checked (Jupiter at Uccle and Saturn at Tokyo against NAOJ;
+  Mars and Venus at Hong Kong against the ephemeris only, and all six of those
+  events *miss* the Moon from Hong Kong), but a fixture per planet for a **Hong
+  Kong** observer that a Hong Kong observer could actually see is still to be
+  transcribed and cross-checked against NAOJ. The NAOJ service returns a rendered
+  figure rather than a data table for a visible Jupiter event, so that check is
+  manual for Jupiter; the Saturn page *does* return a table, which is why the
+  Saturn snapshot carries machine-readable contact times. See
+  `docs/FOR_REVIEW.md` §13.10.
 - Lunar limb profile, grazing occultations, regional visibility.
 - Everything else in the almanac: Sun/Moon positions and events, twilight,
   phases, the 24 solar terms, planets, the batch pipeline, storage, and an API.
@@ -341,12 +421,16 @@ The roadmap is milestones 0–15 in
 foundation) is **closed**; the occultation work is milestone 14 pulled forward.
 The next increments, in order:
 
-1. Commit the CLI work on `feat/cli-local-circumstances` and open a pull request.
-2. Select and verify a local JPL ephemeris (`de440s.bsp` is the documented
-   candidate) with a manifest entry and a separate fetch command.
-3. Milestone 1: one Hong Kong Sun position through a `SkyfieldEngine`.
-4. Milestone 2: one month of Sun events compared against the Hong Kong
+1. Commit the Skyfield comparison work on its branch and open a pull request.
+2. Milestone 1: one Hong Kong Sun position through a `SkyfieldEngine` — the
+   engine and the ephemeris both exist now, so this is the remaining piece (the
+   `sun-position` subcommand and its JSON metadata).
+3. Milestone 2: one month of Sun events compared against the Hong Kong
    Observatory, with an error report in seconds.
+4. A Hong Kong planet-occultation fixture, transcribed per event and
+   cross-checked against NAOJ, to exercise the visibility sweep.
+5. Stage E of [`occultation-data-plan.md`](occultation-data-plan.md): derive the
+   Besselian elements instead of transcribing them.
 
 ## 10. Reading order
 

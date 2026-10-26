@@ -101,19 +101,65 @@ uv run occultation local-circumstances \
   --delta-t-seconds 65
 ```
 
-Add `--format json` for machine-readable output, `--engine compare` to see the
-reference engine's availability, or `--help` for the inline-parameter form.
-Exit codes: `0` success, `1` a printed value did not match, `2` bad usage or
-input, `3` the reference engine is unavailable.
+Add `--format json` for machine-readable output, or `--help` for the
+inline-parameter form. Exit codes: `0` success, `1` a printed value did not
+match, `2` bad usage or input, `3` the reference engine was requested but could
+not be used.
+
+The reference engine (Skyfield + a local JPL ephemeris) can answer on its own, or
+be compared against this repository's own calculation:
+
+```bash
+# The reference answer, clearly labelled as such. Needs no Meeus elements.
+uv run occultation local-circumstances \
+  --location config/locations/hong_kong.toml --delta-t-seconds 69 \
+  --engine skyfield --reference-body saturn --epoch-ut 2024-12-08T08:58:51Z
+
+# Both engines, and the difference between them.
+uv run occultation local-circumstances \
+  --elements tests/fixtures/meeus_saturn_2024_2025.json \
+  --location config/locations/hong_kong.toml --delta-t-seconds 69 \
+  --engine compare --reference-body saturn --epoch-ut 2024-12-08T08:58:51Z
+```
+
+It takes `--reference-body` and `--epoch-ut` rather than an element set because a
+Meeus element set carries no calendar date (`To` is an abstract hour of Dynamical
+Time), so it cannot be handed to an ephemeris. `--engine skyfield` without a body
+exits 3 and says so.
+
+The ephemeris is fetched deliberately, once, and never at runtime:
+
+```bash
+uv run python scripts/fetch_reference_data.py fetch --download \
+  --only jpl-de440s-planetary-ephemeris
+```
 
 ## Check against an independent source
 
-Meeus's Table III rows carry no printed results, so the only independent,
-machine-readable statement about them is NAOJ's per-event visibility status.
+Two independent oracles are used. First, **a second engine**: whereas every other
+test compares this repository's solver against the book or against itself, the
+Skyfield comparison runs both engines over every event of every fixture that
+declares `metadata.body` — currently fourteen events across Jupiter, Saturn, Mars
+and Venus — and requires them to agree. Each event is compared twice, once from
+its `.toml` twin and once from its `.json` twin, so the JSON the CLI consumes is
+held to the ephemeris in its own right and not only to the twin-equality test.
+
+```bash
+uv run pytest tests/reference_cases/test_skyfield_agreement.py -v
+```
+
+It skips when the ephemeris is absent; CI sets `REQUIRE_EPHEMERIS=1` to turn that
+skip into a failure. The two engines define the Moon's radius differently, so the
+separation bound is 0.007 Moon radii rather than zero; the worst measured
+agreement is 0.00333, and both numbers sit next to the measurement in the test.
+
+Second, **NAOJ's published predictions**. Meeus's Table III rows carry no printed
+results, so the machine-readable statement about them is NAOJ's per-event status.
 Re-run the solver for each event and compare it with that saved snapshot:
 
 ```bash
-uv run python scripts/verify_reference_data.py --trace
+uv run python scripts/verify_reference_data.py --dataset jupiter
+uv run python scripts/verify_reference_data.py --dataset saturn --trace
 ```
 
 `--trace` prints the intermediate value of every step of the calculation after

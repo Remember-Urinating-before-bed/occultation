@@ -70,11 +70,60 @@ jobs:
       - name: Install project
         run: uv sync --locked --dev
 
-      # External data is never fetched at runtime. This job only checks that the
-      # committed snapshot still matches its recorded checksum and that the saved
-      # NAOJ reference agrees with this project's solver.
+      # External data is never fetched at runtime. This job checks that the
+      # committed snapshots still match their recorded checksums and that the
+      # saved NAOJ references agree with this project's solver.
+      #
+      # The JPL ephemeris is fetched, not committed (it is 32 MB and
+      # reproducible), so it is deliberately excluded from the checksum check
+      # here and exercised by the `skyfield` job below instead.
       - name: Verify recorded checksums
-        run: uv run python scripts/fetch_reference_data.py verify
+        run: |
+          uv run python scripts/fetch_reference_data.py verify --only naoj-jupiter-occultations-2019-2020
+          uv run python scripts/fetch_reference_data.py verify --only naoj-saturn-occultations-2024-2025
 
-      - name: Check the saved NAOJ snapshot against the solver
-        run: uv run python scripts/verify_reference_data.py
+      - name: Check the saved NAOJ snapshots against the solver
+        run: |
+          uv run python scripts/verify_reference_data.py --dataset jupiter
+          uv run python scripts/verify_reference_data.py --dataset saturn
+
+  skyfield:
+    name: Skyfield Reference Comparison
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.12.7"
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install project
+        run: uv sync --locked --dev
+
+      # The ephemeris is fetched here rather than committed: 32 MB, and
+      # reproducible from the URL and SHA-256 in data/manifest.json. The fetch
+      # step fails if the downloaded file does not match that checksum, so a
+      # re-released upstream file cannot silently change what is being tested.
+      - name: Fetch the JPL ephemeris and check its checksum
+        run: |
+          uv run python scripts/fetch_reference_data.py fetch --download --only jpl-de440s-planetary-ephemeris
+
+      # REQUIRE_EPHEMERIS turns the agreement test's "no ephemeris, skip" into a
+      # failure, so this job cannot go green by quietly skipping its only real
+      # assertion.
+      - name: Compare the custom solver against the ephemeris
+        env:
+          REQUIRE_EPHEMERIS: "1"
+        run: uv run pytest tests/reference_cases/test_skyfield_agreement.py -v
+
+      - name: Re-run the whole suite with the ephemeris present
+        env:
+          REQUIRE_EPHEMERIS: "1"
+        run: uv run pytest --cov=occultation --cov-report=term-missing

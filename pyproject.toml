@@ -21,3 +21,24 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.16.5",
 ]
+
+[tool.mypy]
+# Skyfield ships no type stubs and no py.typed marker. The reference engine's
+# calls into it are therefore untyped by necessity; everything else in the
+# package is checked normally. See src/occultation/reference/skyfield_engine.py.
+[[tool.mypy.overrides]]
+module = ["skyfield.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+# A vendored third-party tree that happens to sit inside the working copy is not
+# this project's code and is not held to this project's lint rules. Excluding it
+# here keeps the gate as the plain `ruff check .` in CI, so anything added under
+# src/, tests/ or scripts/ is still caught, without the gate going red for code
+# nobody here wrote. Remove this exclude if the tree is ever removed.
+extend-exclude = ["ELI5"]
+
+[tool.pytest.ini_options]
+# Collect tests from this project's own suite only. Without this, pytest from the
+# repository root walks any other directory that happens to contain a test file.
+testpaths = ["tests"]
