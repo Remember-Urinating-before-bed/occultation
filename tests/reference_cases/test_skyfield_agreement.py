@@ -31,6 +31,14 @@ nothing in this module needs editing. To add one:
    epoch can be derived from ``To`` and ``delta_t_seconds``.
 3. Run ``uv run pytest tests/reference_cases/test_skyfield_agreement.py -v``.
 
+Discovery covers **both representations** of a fixture, the ``.toml`` and its
+``.json`` twin. Each twin is compared against the ephemeris in its own right,
+so the JSON twin is held to the independent oracle rather than only to the
+twin-equality assertion in ``tests/unit/test_elements_file.py``. That matters
+because the JSON is the representation the CLI and the JSON loader consume:
+a twin test proves the two files carry the same numbers, but only this module
+proves those numbers are the right ones.
+
 When the ephemeris is absent the whole module skips, so a fresh clone with no
 ``data/external/`` still runs the rest of the suite. CI sets
 ``REQUIRE_EPHEMERIS=1`` to turn that skip into a failure, so the comparison
@@ -40,6 +48,7 @@ cannot quietly stop running.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import math
 import os
 import tomllib
@@ -62,21 +71,34 @@ from occultation.reference import (
 
 FIXTURES_DIR = Path(__file__).parents[1] / "fixtures"
 
+#: The two representations every hand-maintained fixture comes in. Both are
+#: compared: the JSON is what the CLI and the JSON loader consume, so it is the
+#: one a wrong number would actually reach a user through.
+FIXTURE_SUFFIXES = (".json", ".toml")
+
+
+def _load(fixture_path: Path) -> dict[str, Any]:
+    """Read a fixture in either representation."""
+    text = fixture_path.read_text(encoding="utf-8")
+    if fixture_path.suffix == ".json":
+        return json.loads(text)
+    return tomllib.loads(text)
+
 
 def _body_fixtures() -> tuple[Path, ...]:
-    """Every fixture that declares ``metadata.body``, discovered rather than listed.
+    """Every fixture file that declares ``metadata.body``, in either form.
 
     A fixture opts in by naming the body it is about; nothing here needs editing
     when a new case is added. Discovery rather than a hard-coded tuple is also
     what keeps this file honest: a fixture cannot be quietly left out of the only
-    independent check in the suite.
+    independent check in the suite, and neither can one of its twins.
     """
     discovered: list[Path] = []
-    for path in sorted(FIXTURES_DIR.glob("*.toml")):
-        with path.open("rb") as fixture_file:
-            document = tomllib.load(fixture_file)
-        if "body" in document.get("metadata", {}):
-            discovered.append(path)
+    for suffix in FIXTURE_SUFFIXES:
+        for path in sorted(FIXTURES_DIR.glob(f"*{suffix}")):
+            document = _load(path)
+            if "body" in document.get("metadata", {}):
+                discovered.append(path)
     return tuple(discovered)
 
 
@@ -94,7 +116,9 @@ REQUIRE_EPHEMERIS = os.environ.get("REQUIRE_EPHEMERIS", "").strip() not in ("", 
 #:
 #: Each bound is roughly twice the worst agreement measured across all fourteen
 #: events of the four body fixtures on 2026-10-27, written here so that loosening
-#: one is a visible decision rather than an escape hatch:
+#: one is a visible decision rather than an escape hatch. The twins of a fixture
+#: carry the same numbers (asserted in ``tests/unit/test_elements_file.py``), so
+#: comparing each event in both representations does not move the worst case:
 #:
 #:     quantity                     worst measured    bound
 #:     |Delta| difference            0.00333 radii     0.007
@@ -135,11 +159,15 @@ def _engine_or_skip() -> SkyfieldEngine:
 
 
 def _fixture_cases() -> list[tuple[Path, str]]:
-    """Every (fixture, event key) pair in a body-tagged fixture."""
+    """Every (fixture file, event key) pair in a body-tagged fixture.
+
+    Each twin is its own case: the same event compared from the TOML and again
+    from the JSON, so a number that is right in one file and wrong in the other
+    cannot hide behind the twin-equality assertion.
+    """
     cases: list[tuple[Path, str]] = []
     for path in BODY_FIXTURES:
-        with path.open("rb") as fixture_file:
-            document = tomllib.load(fixture_file)
+        document = _load(path)
         if "body" not in document.get("metadata", {}):
             continue
         cases.extend((path, date) for date in document["events"])
@@ -147,7 +175,7 @@ def _fixture_cases() -> list[tuple[Path, str]]:
 
 
 CASES = _fixture_cases()
-CASE_IDS = [f"{path.stem}:{date}" for path, date in CASES]
+CASE_IDS = [f"{path.name}:{date}" for path, date in CASES]
 
 
 def _elements(document: dict[str, Any], date: str) -> StarOccultationElements:
@@ -229,8 +257,7 @@ def test_the_two_engines_agree_on_the_closest_approach(
     fixture_path: Path, date: str
 ) -> None:
     engine = _engine_or_skip()
-    with fixture_path.open("rb") as fixture_file:
-        document = tomllib.load(fixture_file)
+    document = _load(fixture_path)
 
     custom = calculate_star_local_circumstances(
         elements=_elements(document, date),
@@ -289,8 +316,7 @@ def test_the_two_engines_agree_on_whether_the_body_is_occulted(
     two engines must reach it independently.
     """
     engine = _engine_or_skip()
-    with fixture_path.open("rb") as fixture_file:
-        document = tomllib.load(fixture_file)
+    document = _load(fixture_path)
 
     custom = calculate_star_local_circumstances(
         elements=_elements(document, date),
@@ -327,8 +353,7 @@ def test_the_two_moon_radius_conventions_differ_by_a_known_amount() -> None:
     """
     engine = _engine_or_skip()
     fixture_path = BODY_FIXTURES[0]
-    with fixture_path.open("rb") as fixture_file:
-        document = tomllib.load(fixture_file)
+    document = _load(fixture_path)
     date = next(iter(document["events"]))
     custom = calculate_star_local_circumstances(
         elements=_elements(document, date),

@@ -1531,7 +1531,10 @@ The roadmap in §9 is the long-term plan. The next increments, in order:
 > `tests/reference_cases/test_skyfield_agreement.py` is the project's first genuinely independent
 > oracle — it runs both engines over every event of every fixture that declares `metadata.body`,
 > now fourteen events across Jupiter, Saturn, Mars and Venus, and requires agreement (worst
-> measured: 0.00333 Moon radii, 114 s). A CI job fetches the ephemeris
+> measured: 0.00333 Moon radii, 114 s). Since 2026-10-27 the discovery covers both representations
+> of each fixture, so every event is compared from its `.toml` twin and again from its `.json`
+> twin: 57 tests, because the JSON the CLI consumes is now held to the ephemeris rather than only
+> to the twin-equality assertion. A CI job fetches the ephemeris
 > and sets `REQUIRE_EPHEMERIS=1` so the comparison cannot skip. **What is left of item 3 is the
 > Sun-position command itself** (`occultation sun-position`), then milestone 2's HKO comparison.
 >

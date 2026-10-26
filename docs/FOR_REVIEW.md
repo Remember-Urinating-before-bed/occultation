@@ -462,6 +462,12 @@ Moon by several radii has a shallow separation curve, so a small geometry
 difference moves the minimum a long way; the 2032-04-12 Mars row, which misses by
 5.9 radii, accounts for the time, angle and altitude extremes by itself.
 
+Each event is compared in both of its representations, the `.toml` and the `.json`
+twin, so the numbers above hold for the JSON the CLI consumes as well as for the
+TOML the reference tests read. The twins carry identical values — that is what
+`tests/unit/test_elements_file.py` asserts — so the two comparisons cannot drift
+apart without one of the two tests failing.
+
 The four Mars and Venus events are also the only rows transcribed from a
 *different edition* of the book, and their declinations sit 0.001–0.003° away from
 the ephemeris where the Saturn and Jupiter rows sit 0.0001° away. Their fixture

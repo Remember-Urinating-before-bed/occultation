@@ -140,7 +140,9 @@ Two independent oracles are used. First, **a second engine**: whereas every othe
 test compares this repository's solver against the book or against itself, the
 Skyfield comparison runs both engines over every event of every fixture that
 declares `metadata.body` — currently fourteen events across Jupiter, Saturn, Mars
-and Venus — and requires them to agree.
+and Venus — and requires them to agree. Each event is compared twice, once from
+its `.toml` twin and once from its `.json` twin, so the JSON the CLI consumes is
+held to the ephemeris in its own right and not only to the twin-equality test.
 
 ```bash
 uv run pytest tests/reference_cases/test_skyfield_agreement.py -v
