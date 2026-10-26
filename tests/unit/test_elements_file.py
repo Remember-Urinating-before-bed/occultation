@@ -112,16 +112,32 @@ def test_the_jupiter_fixture_twins_agree() -> None:
 
 
 def test_the_saturn_fixture_twins_agree() -> None:
-    """The Saturn twins are hand-maintained; a slip in either one must fail.
-
-    This holds while the fixture is still a scaffold too: the placeholder values
-    in the two files must stay identical so that filling one in without the other
-    is caught here rather than in the reference test.
-    """
+    """The Saturn twins are hand-maintained; a slip in either one must fail."""
     import tomllib
 
     json_path = FIXTURE_PATH.parent / "meeus_saturn_2024_2025.json"
     toml_path = FIXTURE_PATH.parent / "meeus_saturn_2024_2025.toml"
+    json_document = json.loads(json_path.read_text(encoding="utf-8"))
+    with toml_path.open("rb") as toml_file:
+        toml_document = tomllib.load(toml_file)
+
+    assert json_document["metadata"] == toml_document["metadata"]
+    assert json_document["observer"] == toml_document["observer"]
+    assert json_document["event"] == toml_document["event"]
+    assert json_document["events"] == toml_document["events"]
+
+
+@pytest.mark.parametrize("stem", ["meeus_mars_2031_2032", "meeus_venus_2027_2028"])
+def test_the_mars_and_venus_fixture_twins_agree(stem: str) -> None:
+    """Two twins per fixture, six events, transcribed by hand; they must agree.
+
+    These two pairs are the ones that carry corrections (sign flips, moved
+    columns), so they are exactly the pairs where a twin could drift.
+    """
+    import tomllib
+
+    json_path = FIXTURE_PATH.parent / f"{stem}.json"
+    toml_path = FIXTURE_PATH.parent / f"{stem}.toml"
     json_document = json.loads(json_path.read_text(encoding="utf-8"))
     with toml_path.open("rb") as toml_file:
         toml_document = tomllib.load(toml_file)

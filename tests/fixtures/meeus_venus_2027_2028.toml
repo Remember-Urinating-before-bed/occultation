@@ -1,0 +1,139 @@
+# Twin of meeus_venus_2027_2028.json.
+#
+# Source: three consecutive Venus rows of Meeus, Astronomical Tables, Table III
+# (Occultations chapter), transcribed BY HAND by the project owner on 2026-10-27
+# from their own copy of the book. The page numbers were not recorded.
+#
+# Two corrections were applied to the transcription, both forced by the
+# ephemeris and both written down here rather than silently:
+#
+# 1. 2027 Aug 2: Y1 and Y2 were transcribed as +0.201010 and +0.000137, but the
+#    row's Y0 is -0.463605 and the ephemeris has Y increasing negatively
+#    (Y1 = -0.199561, Y2 = -0.000140). The signs are flipped here. With the
+#    plus signs the solver reports the body as occulted from Hong Kong at
+#    Delta = +0.651 (a false event); with the minus signs it reports a miss at
+#    2.83 Moon radii, which is what the ephemeris says.
+# 2. 2028 Mar 30: H0 and H1 were transcribed as 2.28713 and 210.54873. The
+#    first is identical to the 2027 Nov 30 row's H0 (a copy), and the second is
+#    210.548 in the H0 column's place. H0 = 210.54873 and H1 = 15.00145 are
+#    used, the ephemeris's values at To = 5h. H1 is therefore the one number in
+#    this fixture that is derived rather than transcribed.
+#
+# To is not in the transcription. It was recovered by fitting the transcribed
+# D0/H0/X0/Y0 against the ephemeris and lands on an integer hour (5h, 14h, 5h).
+#
+# The observer is Hong Kong (the project's own site), not the site the printed
+# elements were prepared for. All three events MISS the Moon from Hong Kong.
+#
+# The 'expected' block is DERIVED from this repository's own solver and is a
+# regression lock on current behaviour, not an independent oracle.
+
+[metadata]
+source = "Transcribed by the user from their own copy of Meeus, Astronomical Tables (Occultations chapter)"
+example = "Occultations of Venus, 2027 Aug 2 to 2028 Mar 30"
+printed_pages = "not recorded"
+pdf_pages = "not recorded"
+body = "Venus"
+event_keys_are = "universal-time dates (the calendar date of To - Delta T in UT)"
+note = "Three consecutive Venus rows of Table III, transcribed by hand by the project owner on 2026-10-27 from their own copy of the book (page numbers not recorded). Two corrections were forced by the ephemeris and are documented in the header of the TOML twin: the 2027-08-02 Y1/Y2 signs were flipped, and the 2028-03-30 H0/H1 had been transcribed into each other's places (H0 was a copy of the 2027-11-30 row, and H1 carried 210.548). To is not in the transcription; it was recovered by fitting D0/H0/X0/Y0 against the ephemeris and lands on an integer hour (5h, 14h, 5h). The observer is Hong Kong, not the site the printed elements were prepared for, so these rows test the plumbing and the custom-vs-ephemeris agreement, not a Hong Kong prediction. All three events miss the Moon from Hong Kong. The 'expected' block is DERIVED from this repository's own solver (a regression lock); the independent check is test_skyfield_agreement.py."
+
+[metadata.tolerances]
+hours_after_reference = 1e-06
+separation_in_moon_radii = 1e-06
+position_angle_deg = 0.01
+altitude_deg = 0.01
+
+[observer]
+longitude_deg_east = 114.1743
+latitude_deg = 22.302
+elevation_m = 0.0
+
+[event]
+delta_t_seconds = 69.0
+
+[events.2027-08-02]
+reference_hour_td = 5
+
+[events.2027-08-02.elements]
+star_declination_deg = 19.50561
+declination_rate_deg_per_hour = -0.01166
+greenwich_hour_angle_at_reference_deg = 255.89698
+greenwich_hour_angle_rate_deg_per_hour = 14.98885
+aberration_term = 6.72
+moon_shadow_radius_earth_radii = 0.272872
+
+[events.2027-08-02.elements.moon_shadow_x]
+at_reference = -0.447377
+linear_rate_per_hour = 0.535878
+quadratic_term_per_hour_squared = -3.6e-05
+
+[events.2027-08-02.elements.moon_shadow_y]
+at_reference = -0.463605
+linear_rate_per_hour = -0.20101
+quadratic_term_per_hour_squared = -0.000137
+
+[events.2027-08-02.expected]
+hours_after_reference = 0.484098
+separation_in_moon_radii = 2.83054
+position_angle_deg = 36.4804
+altitude_deg = 73.8471
+is_occultation = false
+is_visible = false
+
+[events.2027-11-30]
+reference_hour_td = 14
+
+[events.2027-11-30.elements]
+star_declination_deg = -24.77016
+declination_rate_deg_per_hour = 0.00114
+greenwich_hour_angle_at_reference_deg = 2.28713
+greenwich_hour_angle_rate_deg_per_hour = 14.98522
+aberration_term = 8.15
+moon_shadow_radius_earth_radii = 0.273002
+
+[events.2027-11-30.elements.moon_shadow_x]
+at_reference = 0.318533
+linear_rate_per_hour = 0.500648
+quadratic_term_per_hour_squared = -8.1e-05
+
+[events.2027-11-30.elements.moon_shadow_y]
+at_reference = -0.905269
+linear_rate_per_hour = 0.069601
+quadratic_term_per_hour_squared = 0.000242
+
+[events.2027-11-30.expected]
+hours_after_reference = 1.11273
+separation_in_moon_radii = 3.396851
+position_angle_deg = 347.7434
+altitude_deg = -46.9107
+is_occultation = false
+is_visible = false
+
+[events.2028-03-30]
+reference_hour_td = 5
+
+[events.2028-03-30.elements]
+star_declination_deg = 22.69141
+declination_rate_deg_per_hour = 0.01194
+greenwich_hour_angle_at_reference_deg = 210.54873
+greenwich_hour_angle_rate_deg_per_hour = 15.00145
+aberration_term = 17.97
+moon_shadow_radius_earth_radii = 0.273594
+
+[events.2028-03-30.elements.moon_shadow_x]
+at_reference = -0.003335
+linear_rate_per_hour = 0.519564
+quadratic_term_per_hour_squared = 2.9e-05
+
+[events.2028-03-30.elements.moon_shadow_y]
+at_reference = 1.009501
+linear_rate_per_hour = 0.102756
+quadratic_term_per_hour_squared = -0.000175
+
+[events.2028-03-30.expected]
+hours_after_reference = -2.135086
+separation_in_moon_radii = -2.309294
+position_angle_deg = 156.022
+altitude_deg = 28.1413
+is_occultation = false
+is_visible = false
