@@ -62,11 +62,25 @@ from occultation.reference import (
 
 FIXTURES_DIR = Path(__file__).parents[1] / "fixtures"
 
-#: Fixtures carrying ``metadata.body``, i.e. those this module can check.
-BODY_FIXTURES = (
-    FIXTURES_DIR / "meeus_jupiter_2019_2020.toml",
-    FIXTURES_DIR / "meeus_saturn_2024_2025.toml",
-)
+
+def _body_fixtures() -> tuple[Path, ...]:
+    """Every fixture that declares ``metadata.body``, discovered rather than listed.
+
+    A fixture opts in by naming the body it is about; nothing here needs editing
+    when a new case is added. Discovery rather than a hard-coded tuple is also
+    what keeps this file honest: a fixture cannot be quietly left out of the only
+    independent check in the suite.
+    """
+    discovered: list[Path] = []
+    for path in sorted(FIXTURES_DIR.glob("*.toml")):
+        with path.open("rb") as fixture_file:
+            document = tomllib.load(fixture_file)
+        if "body" in document.get("metadata", {}):
+            discovered.append(path)
+    return tuple(discovered)
+
+
+BODY_FIXTURES = _body_fixtures()
 
 #: When set (CI does), a missing ephemeris fails rather than skips. Without it a
 #: developer who has not fetched the kernel still gets a green local run.
@@ -78,23 +92,30 @@ REQUIRE_EPHEMERIS = os.environ.get("REQUIRE_EPHEMERIS", "").strip() not in ("", 
 #: :mod:`occultation.reference.skyfield_engine` for why the Moon's radius is
 #: defined differently on the two sides.
 #:
-#: Each bound is roughly twice the worst agreement measured across the eight
-#: events in the two fixtures on 2026-10-20, which is written here so that
-#: loosening one is a visible decision rather than an escape hatch:
+#: Each bound is roughly twice the worst agreement measured across all fourteen
+#: events of the four body fixtures on 2026-10-27, written here so that loosening
+#: one is a visible decision rather than an escape hatch:
 #:
 #:     quantity                     worst measured    bound
-#:     |Delta| difference            0.00199 radii     0.003
-#:     closest-approach time        16.5 s            36 s
-#:     position angle               0.25 deg          0.5 deg
-#:     Moon altitude                1.18 deg          1.5 deg
+#:     |Delta| difference            0.00333 radii     0.007
+#:     closest-approach time       113.6 s            240 s
+#:     position angle               0.62 deg          1.5 deg
+#:     Moon altitude                1.39 deg          2.5 deg
 #:
-#: The time and altitude differences are largest for the events that miss the
-#: Moon by several radii, where the separation curve is shallow and a small
-#: geometry difference moves the minimum a long way.
-MAX_SEPARATION_DIFFERENCE_MOON_RADII = 0.003
-MAX_TIME_DIFFERENCE_HOURS = 36.0 / 3600.0
-MAX_POSITION_ANGLE_DIFFERENCE_DEG = 0.5
-MAX_ALTITUDE_DIFFERENCE_DEG = 1.5
+#: The worst cases are not the occulting events. An event that misses the Moon by
+#: several radii has a shallow separation curve, so a small geometry difference
+#: moves the minimum a long way; the 2032-04-12 Mars row misses by 5.9 radii and
+#: accounts for the time, angle and altitude extremes by itself.
+#:
+#: The four Mars and Venus events are also the only rows transcribed from a
+#: different edition of the book, and their declinations sit 0.001-0.003 deg
+#: (4-11 arcsec) away from the ephemeris where the Saturn and Jupiter rows sit
+#: 0.0001 deg away. That is a property of the source, recorded in the fixture
+#: headers, not something to tune away here.
+MAX_SEPARATION_DIFFERENCE_MOON_RADII = 0.007
+MAX_TIME_DIFFERENCE_HOURS = 240.0 / 3600.0
+MAX_POSITION_ANGLE_DIFFERENCE_DEG = 1.5
+MAX_ALTITUDE_DIFFERENCE_DEG = 2.5
 
 
 def _engine_or_skip() -> SkyfieldEngine:
