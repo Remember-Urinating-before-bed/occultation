@@ -138,8 +138,9 @@ uv run python scripts/fetch_reference_data.py fetch --download \
 
 Two independent oracles are used. First, **a second engine**: whereas every other
 test compares this repository's solver against the book or against itself, the
-Skyfield comparison runs both engines over the eight Jupiter and Saturn events and
-requires them to agree.
+Skyfield comparison runs both engines over every event of every fixture that
+declares `metadata.body` — currently fourteen events across Jupiter, Saturn, Mars
+and Venus — and requires them to agree.
 
 ```bash
 uv run pytest tests/reference_cases/test_skyfield_agreement.py -v
@@ -147,8 +148,8 @@ uv run pytest tests/reference_cases/test_skyfield_agreement.py -v
 
 It skips when the ephemeris is absent; CI sets `REQUIRE_EPHEMERIS=1` to turn that
 skip into a failure. The two engines define the Moon's radius differently, so the
-separation bound is 0.003 Moon radii rather than zero; the worst measured
-agreement is 0.00199, and the bound sits next to the measurement in the test.
+separation bound is 0.007 Moon radii rather than zero; the worst measured
+agreement is 0.00333, and both numbers sit next to the measurement in the test.
 
 Second, **NAOJ's published predictions**. Meeus's Table III rows carry no printed
 results, so the machine-readable statement about them is NAOJ's per-event status.

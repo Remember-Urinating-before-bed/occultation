@@ -19,10 +19,12 @@ Three datasets:
 - `jpl-de440s-planetary-ephemeris` — the JPL DE440s SPICE kernel at
   `data/external/de440s.bsp`. This is the independent oracle for the Skyfield
   comparison: `tests/reference_cases/test_skyfield_agreement.py` runs the custom
-  Besselian solver and Skyfield reading this kernel over the same eight events
-  and requires them to agree. It is **fetched, not committed** — 32 MB, and
-  reproducible from the recorded URL and checksum — so `data/external/` is
-  git-ignored and CI downloads the file before running the comparison.
+  Besselian solver and Skyfield reading this kernel over every event of every
+  fixture that declares `metadata.body` — fourteen events across the Jupiter,
+  Saturn, Mars and Venus fixtures — and requires them to agree. It is **fetched,
+  not committed** — 32 MB, and reproducible from the recorded URL and checksum —
+  so `data/external/` is git-ignored and CI downloads the file before running the
+  comparison.
 
 - `naoj-jupiter-occultations-2019-2020` — a human-saved NAOJ snapshot of the
   four Jupiter events of Meeus Table III (2019 November 28 to 2020 February 19),

@@ -110,6 +110,7 @@ occultation/
     ├── reference_cases/test_meeus_mars.py      # the planet regression
     ├── reference_cases/test_meeus_jupiter.py   # 4 Table III rows, Uccle
     ├── reference_cases/test_meeus_saturn.py    # 4 Table III rows, Tokyo
+    ├── reference_cases/test_meeus_mars_venus.py  # 6 rows, Hong Kong (all miss)
     ├── reference_cases/test_skyfield_agreement.py  # the INDEPENDENT oracle
     └── fixtures/
         ├── meeus_regulus_1999.toml   # Example 5 inputs and expected values
@@ -119,6 +120,9 @@ occultation/
         └── meeus_{jupiter_2019_2020,saturn_2024_2025}.{toml,json}
                                       # Table III rows; expected DERIVED from this
                                       # solver, oracle = the NAOJ snapshots
+            meeus_{mars_2031_2032,venus_2027_2028}.{toml,json}
+                                      # hand transcription from another edition;
+                                      # oracle = the Skyfield comparison only
 ```
 
 `local/` also exists but is **git-ignored** (`local/.gitignore` contains `*`). It
@@ -177,8 +181,8 @@ Private helpers, each one formula: `_relative_motion_at`, `_local_hour_angle_deg
 ### `src/occultation/cli.py`
 
 Two subcommands, and no astronomy in the file at all: it parses arguments, hands
-them to `io/` to become domain values, calls the custom core (or the reference
-placeholder), and formats the answer.
+them to `io/` to become domain values, calls the custom core or the reference
+engine, and formats the answer.
 
 ```bash
 uv run occultation local-circumstances \
@@ -191,11 +195,16 @@ uv run occultation verify meeus-example-5
 `local-circumstances` accepts either a file or the equivalent inline options for
 both the elements and the observer. It refuses to mix the two, and
 `--delta-t-seconds` is required because ΔT is never guessed. `--format json`
-emits `{engine, algorithm, inputs, derived, result[, comparison]}`; `--engine
-skyfield` exits `3`; `--engine compare` adds the comparison block. `verify`
-re-runs a published example from the fixture the regression test also reads and
-exits `1` on a mismatch. Exit codes: `0` success, `1` mismatch, `2` bad
-usage/input, `3` reference engine unavailable.
+emits `{engine, algorithm, inputs, derived, result[, comparison]}`.
+`--engine skyfield` runs only the reference engine and prints a document labelled
+`engine: skyfield` with a `reference` key and **no** `result` key, so a machine
+reader cannot mistake it for this repository's own answer; it needs
+`--reference-body` and `--epoch-ut`, and without them it exits `3` with the
+reason. `--engine compare` runs both and adds a `comparison` block that is either
+`compared` (both answers and their difference) or `not_compared` (with the
+reason). `verify` re-runs a published example from the fixture the regression test
+also reads and exits `1` on a mismatch. Exit codes: `0` success, `1` mismatch, `2`
+bad usage/input, `3` the reference engine could not be used.
 
 ### `src/occultation/io/`
 
@@ -260,13 +269,22 @@ The engine takes a body and an epoch instead — `--reference-body` and
 - `reference_cases/test_meeus_saturn.py` + `tests/fixtures/meeus_saturn_2024_2025.{toml,json}`
   — the same shape for four Saturn events at Tokyo, cross-checked against NAOJ
   by `scripts/verify_reference_data.py --dataset saturn`.
+- `reference_cases/test_meeus_mars_venus.py` +
+  `tests/fixtures/meeus_{mars_2031_2032,venus_2027_2028}.{toml,json}` — six rows
+  transcribed by the project owner from a different edition of the book, at Hong
+  Kong. Their headers are the important part: `To` was reconstructed by fitting
+  the transcription against the ephemeris, and two transcriptions were corrected
+  (a flipped `Y1`/`Y2` pair and an `H0`/`H1` swap). All six events miss the Moon
+  from Hong Kong, so these rows test the plumbing and the agreement, not a
+  prediction.
 - `reference_cases/test_skyfield_agreement.py` — **the independent-oracle test.**
   Runs the custom solver and Skyfield over every event of every fixture that
-  declares `metadata.body`, and requires them to agree on the instant, the
-  separation, the position angle, the altitude, and the visibility verdict. This
-  is the only test in the suite whose oracle is not either the book or this
-  solver itself. It skips when the ephemeris is absent, and CI sets
-  `REQUIRE_EPHEMERIS=1` to turn that skip into a failure.
+  declares `metadata.body` — discovered, so a new fixture cannot be left out —
+  and requires them to agree on the instant, the separation, the position angle,
+  the altitude, and the visibility verdict. This is the only test in the suite
+  whose oracle is not either the book or this solver itself. It skips when the
+  ephemeris is absent, and CI sets `REQUIRE_EPHEMERIS=1` to turn that skip into a
+  failure.
 
 
 ## 5. The regression that proves it works
@@ -380,14 +398,16 @@ the network, and it needs it before the tests run, never during.
   occultation directly from the ephemeris, but it cannot *produce* the elements
   the custom solver consumes — that means computing the Moon's shadow geometry
   and fitting the polynomials. The elements are inputs today.
-- A Hong Kong visibility sweep over the eight planets. Two multi-event fixtures
-  exist and are cross-checked against NAOJ (Jupiter at Uccle, Saturn at Tokyo),
-  but a fixture per planet for a **Hong Kong** observer that a Hong Kong
-  observer could actually see is still to be transcribed and cross-checked
-  against NAOJ. The NAOJ service returns a rendered figure rather than a data
-  table for a visible Jupiter event, so that check is manual for Jupiter; the
-  Saturn page *does* return a table, which is why the Saturn snapshot carries
-  machine-readable contact times. See `docs/FOR_REVIEW.md` §13.10.
+- A Hong Kong visibility sweep over the eight planets. Four multi-event fixtures
+  exist and are cross-checked (Jupiter at Uccle and Saturn at Tokyo against NAOJ;
+  Mars and Venus at Hong Kong against the ephemeris only, and all six of those
+  events *miss* the Moon from Hong Kong), but a fixture per planet for a **Hong
+  Kong** observer that a Hong Kong observer could actually see is still to be
+  transcribed and cross-checked against NAOJ. The NAOJ service returns a rendered
+  figure rather than a data table for a visible Jupiter event, so that check is
+  manual for Jupiter; the Saturn page *does* return a table, which is why the
+  Saturn snapshot carries machine-readable contact times. See
+  `docs/FOR_REVIEW.md` §13.10.
 - Lunar limb profile, grazing occultations, regional visibility.
 - Everything else in the almanac: Sun/Moon positions and events, twilight,
   phases, the 24 solar terms, planets, the batch pipeline, storage, and an API.

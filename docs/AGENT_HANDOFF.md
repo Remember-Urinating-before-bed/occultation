@@ -1529,10 +1529,23 @@ The roadmap in §9 is the long-term plan. The next increments, in order:
 > loads it from an explicit local path and answers lunar-occultation geometry for a body at an
 > epoch (`--engine skyfield`, `--engine compare`, needs `--reference-body` and `--epoch-ut`); and
 > `tests/reference_cases/test_skyfield_agreement.py` is the project's first genuinely independent
-> oracle — it runs both engines over the eight events of the Jupiter and Saturn fixtures and
-> requires agreement (worst measured: 0.00199 Moon radii, 16.5 s). A CI job fetches the ephemeris
+> oracle — it runs both engines over every event of every fixture that declares `metadata.body`,
+> now fourteen events across Jupiter, Saturn, Mars and Venus, and requires agreement (worst
+> measured: 0.00333 Moon radii, 114 s). A CI job fetches the ephemeris
 > and sets `REQUIRE_EPHEMERIS=1` so the comparison cannot skip. **What is left of item 3 is the
 > Sun-position command itself** (`occultation sun-position`), then milestone 2's HKO comparison.
+>
+> **Status 2026-10-27: six more Table III rows exist (Mars 2031-2032, Venus 2027-2028), transcribed
+> by the project owner from a different edition of the book.** Three things about them belong here
+> rather than only in the fixture headers, because they are transcription lessons: (a) the
+> transcription did not carry `To`, which was reconstructed by fitting `D0`/`H0`/`X0`/`Y0` against
+> the ephemeris and landed on an integer hour every time; (b) the Venus 2027-08-02 `Y1`/`Y2` signs
+> were flipped, and with the transcribed signs the solver reports a *false Hong Kong occultation*
+> at Delta = +0.651 — an error that only a second engine catches, since the `expected` block would
+> have agreed with it; (c) the Venus 2028-03-30 `H0`/`H1` were in each other's places, with `H0`
+> copied from the preceding row. All six events miss the Moon from Hong Kong. Their declinations
+> sit 0.001-0.003 deg from the ephemeris against 0.0001 deg for the older rows, consistent with a
+> different edition; that is recorded, not corrected.
 
 1. **Make the quality gate green** (milestone 0, §7.2): fix D1 (entry point), D2 (`hk_almanac` →
    `occultation` imports), D3/D5 (re-type the broken modules and tests), D4 (valid TOML fixture),

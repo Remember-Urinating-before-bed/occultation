@@ -446,19 +446,29 @@ true distance — so they differ at roughly the 0.1% level by construction. The
 comparison tolerance is quoted in thousandths of a Moon radius on that basis, not
 in the last printed digit.
 
-Over the eight events of the Jupiter and Saturn fixtures the two engines agree to:
+Over the fourteen events of the four body fixtures — Jupiter, Saturn, Mars and
+Venus — the two engines agree to:
 
 ```text
-quantity                     worst             bound in the test
-|Delta| difference            0.00199 radii     0.003
-closest-approach time        16.5 s            36 s
-position angle               0.25 deg          0.5 deg
-Moon altitude                1.18 deg          1.5 deg
+quantity                     worst measured    bound in the test
+|Delta| difference            0.00333 radii     0.007
+closest-approach time       113.6 s            240 s
+position angle               0.62 deg          1.5 deg
+Moon altitude                1.39 deg          2.5 deg
 ```
 
-The larger time and altitude differences are for the events that miss the Moon by
-several radii, where the separation curve is shallow and a small geometry
-difference moves the minimum a long way.
+The larger differences are not on the occulting events. An event that misses the
+Moon by several radii has a shallow separation curve, so a small geometry
+difference moves the minimum a long way; the 2032-04-12 Mars row, which misses by
+5.9 radii, accounts for the time, angle and altitude extremes by itself.
+
+The four Mars and Venus events are also the only rows transcribed from a
+*different edition* of the book, and their declinations sit 0.001–0.003° away from
+the ephemeris where the Saturn and Jupiter rows sit 0.0001° away. Their fixture
+headers record that, and record the two transcriptions that had to be corrected
+(a flipped `Y1`/`Y2` sign pair, and an `H0`/`H1` swap that had copied a value from
+the preceding row). Those two corrections are worth reading before trusting any
+number in those fixtures.
 
 ## 9. What the JSON output looks like
 
